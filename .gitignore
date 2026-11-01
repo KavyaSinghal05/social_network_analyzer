@@ -1,5 +1,8 @@
 *.exe
 *.o
+*.gz
 build/
 __pycache__/
 *.pyc
+~$*
+
