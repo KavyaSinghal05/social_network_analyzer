@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social Network Graph Analyzer — Web Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .glass {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+        .feature-card:hover {
+            transform: translateY(-4px);
+            transition: all 0.3s ease;
+        }
+        .result-box {
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+
+    <!-- Navbar -->
+    <nav class="bg-indigo-700 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-indigo-400 rounded-lg flex items-center justify-center font-bold text-xl">SN</div>
+                <h1 class="text-xl font-bold tracking-tight">Social Network Analyzer</h1>
+            </div>
+            <div class="text-sm text-indigo-100">CSR Graph • SNAP Facebook Dataset</div>
+        </div>
+    </nav>
+
+    <!-- Header Stats -->
+    <div class="max-w-7xl mx-auto px-4 py-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <div class="text-gray-500 text-xs font-semibold uppercase tracking-wider">Total Nodes</div>
+                <div class="text-3xl font-bold mt-1">{{ total_nodes }}</div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <div class="text-gray-500 text-xs font-semibold uppercase tracking-wider">Total Edges</div>
+                <div class="text-3xl font-bold mt-1 text-indigo-600">{{ total_edges }}</div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <div class="text-gray-500 text-xs font-semibold uppercase tracking-wider">Avg Degree</div>
+                <div class="text-3xl font-bold mt-1 text-green-600">{{ avg_degree }}</div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <div class="text-gray-500 text-xs font-semibold uppercase tracking-wider">Max Degree</div>
+                <div class="text-3xl font-bold mt-1 text-red-600">{{ max_degree }}</div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <div class="text-gray-500 text-xs font-semibold uppercase tracking-wider">Min Degree</div>
+                <div class="text-3xl font-bold mt-1 text-yellow-600">{{ min_degree }}</div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                <div class="text-gray-500 text-xs font-semibold uppercase tracking-wider">Density</div>
+                <div class="text-3xl font-bold mt-1 text-purple-600">0.0108</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feature Grid -->
+    <div class="max-w-7xl mx-auto px-4 pb-12">
+        <div class="flex flex-col md:flex-row gap-6">
+            
+            <!-- Left Column -->
+            <div class="flex-1 flex flex-col gap-6">
+                
+                <!-- Graph Statistics -->
+                <div class="glass rounded-xl shadow-sm border border-gray-200 p-6 feature-card">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-chart-bar"></i>
+                        </div>
+                        <h2 class="text-lg font-bold">Graph Statistics</h2>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-6">View comprehensive graph metrics computed from the CSR representation.</p>
+                    <button onclick="loadStats()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition-colors">
+                        Load Statistics
+                    </button>
+                    <div id="stats-output" class="mt-4 hidden result-box p-4 bg-gray-100 rounded-lg text-sm font-mono">
+                    </div>
+                </div>
+
+                <!-- BFS Traversal -->
+                <div class="glass rounded-xl shadow-sm border border-gray-200 p-6 feature-card">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 bg-green-100 text-green-600 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-sitemap"></i>
+                        </div>
+                        <h2 class="text-lg font-bold">BFS Traversal</h2>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-6">Breadth-First Search from any node (ID or name).</p>
+                    <input type="text" id="bfs-input" placeholder="Enter node ID or name" class="w-full p-2 border border-gray-300 rounded-lg mb-3 text-sm">
+                    <button onclick="runBFS()" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-medium transition-colors">
+                        Run BFS
+                    </button>
+                    <div id="bfs-output" class="mt-4 hidden result-box p-4 bg-gray-100 rounded-lg max-h-64 overflow-y-auto text-sm"></div>
+                </div>
+
+                <!-- DFS Traversal -->
+                <div class="glass rounded-xl shadow-sm border border-gray-200 p-6 feature-card">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-tree"></i>
+                        </div>
+                        <h2 class="text-lg font-bold">DFS Traversal</h2>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-6">Iterative Depth-First Search using explicit stack.</p>
+                    <input type="text" id="dfs-input" placeholder="Enter node ID or name" class="w-full p-2 border border-gray-300 rounded-lg mb-3 text-sm">
+                    <button onclick="runDFS()" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-medium transition-colors">
+                        Run DFS
+                    </button>
+                    <div id="dfs-output" class="mt-4 hidden result-box p-4 bg-gray-100 rounded-lg max-h-64 overflow-y-auto text-sm"></div>
+                </div>
+
+            </div>
+
+            <!-- Right Column -->
+            <div class="flex-1 flex flex-col gap-6">
+                
+                <!-- Shortest Path -->
+                <div class="glass rounded-xl shadow-sm border border-gray-200 p-6 feature-card">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-route"></i>
+                        </div>
+                        <h2 class="text-lg font-bold">Shortest Path (Bi-BFS)</h2>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-6">Bidirectional BFS between two nodes.</p>
+                    <input type="text" id="sp-src" placeholder="Source node ID or name" class="w-full p-2 border border-gray-300 rounded-lg mb-2 text-sm">
+                    <input type="text" id="sp-dst" placeholder="Destination node ID or name" class="w-full p-2 border border-gray-300 rounded-lg mb-3 text-sm">
+                    <button onclick="runShortestPath()" class="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 rounded-lg font-medium transition-colors">
+                        Find Path
+                    </button>
+                    <div id="sp-output" class="mt-4 hidden result-box p-4 bg-gray-100 rounded-lg text-sm"></div>
+                </div>
+
+                <!-- PageRank -->
+                <div class="glass rounded-xl shadow-sm border border-gray-200 p-6 feature-card">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 bg-red-100 text-red-600 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <h2 class="text-lg font-bold">PageRank Analysis</h2>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-6">Iterative PageRank centrality scores (top 10).</p>
+                    <button onclick="runPageRank()" class="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-medium transition-colors">
+                        Compute PageRank
+                    </button>
+                    <div id="pagerank-output" class="mt-4 hidden result-box p-4 bg-gray-100 rounded-lg max-h-64 overflow-y-auto text-sm"></div>
+                </div>
+
+                <!-- Friend Suggestions -->
+                <div class="glass rounded-xl shadow-sm border border-gray-200 p-6 feature-card">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 bg-teal-100 text-teal-600 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <h2 class="text-lg font-bold">Friend Suggestions</h2>
+                    </div>
+                    <p class="text-gray-600 text-sm mb-6">2-hop "friend of a friend" recommendations.</p>
+                    <input type="text" id="sugg-input" placeholder="Enter node ID or name" class="w-full p-2 border border-gray-300 rounded-lg mb-3 text-sm">
+                    <button onclick="runSuggestions()" class="w-full bg-teal-600 hover:bg-teal-700 text-white py-3 rounded-lg font-medium transition-colors">
+                        Get Suggestions
+                    </button>
+                    <div id="sugg-output" class="mt-4 hidden result-box p-4 bg-gray-100 rounded-lg max-h-64 overflow-y-auto text-sm"></div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- Bottom Row: Additional Features -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+            <div class="glass rounded-xl shadow-sm border border-gray-200 p-6 feature-card">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-10 h-10 bg-cyan-100 text-cyan-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    <h2 class="text-lg font-bold">Search by Name</h2>
+                </div>
+                <input type="text" id="search-input" placeholder="Type name to search" class="w-full p-2 border border-gray-300 rounded-lg mb-3 text-sm">
+                <button onclick="searchName()" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white py-3 rounded-lg font-medium transition-colors">
+                    Search
+                </button>
+                <div id="search-output" class="mt-4 hidden result-box p-4 bg-gray-100 rounded-lg max-h-64 overflow-y-auto text-sm"></div>
+            </div>
+
+            <div class="glass rounded-xl shadow-sm border border-gray-200 p-6 feature-card">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-10 h-10 bg-pink-100 text-pink-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-layer-group"></i>
+                    </div>
+                    <h2 class="text-lg font-bold">Connected Components</h2>
+                </div>
+                <p class="text-gray-600 text-sm mb-4">Union-Find component analysis.</p>
+                <button onclick="runComponents()" class="w-full bg-pink-600 hover:bg-pink-700 text-white py-3 rounded-lg font-medium transition-colors">
+                    Analyze Components
+                </button>
+                <div id="components-output" class="mt-4 hidden result-box p-4 bg-gray-100 rounded-lg max-h-64 overflow-y-auto text-sm"></div>
+            </div>
+
+            <div class="glass rounded-xl shadow-sm border border-gray-200 p-6 feature-card">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-layer-group"></i>
+                    </div>
+                    <h2 class="text-lg font-bold">Top Degree Nodes</h2>
+                </div>
+                <input type="number" id="topk-input" placeholder="K (default 10)" value="10" class="w-full p-2 border border-gray-300 rounded-lg mb-3 text-sm">
+                <button onclick="runTopDegree()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition-colors">
+                    Get Top Nodes
+                </button>
+                <div id="topk-output" class="mt-4 hidden result-box p-4 bg-gray-100 rounded-lg max-h-64 overflow-y-auto text-sm"></div>
+            </div>
+        </div>
+
+        <!-- Chart Section -->
+        <div class="glass rounded-xl shadow-sm border border-gray-200 p-6 mt-8">
+            <h2 class="text-lg font-bold mb-4">Degree Distribution</h2>
+            <div class="h-64">
+                <canvas id="degreeChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global Chart instance
+        let degreeChart = null;
+
+        async function fetchAPI(endpoint, method = 'GET', body = null) {
+            const opts = { method, headers: { 'Content-Type': 'application/json' } };
+            if (body) opts.body = JSON.stringify(body);
+            const res = await fetch('/api/' + endpoint, opts);
+            return res.json();
+        }
+
+        async function loadStats() {
+            const data = await fetchAPI('stats');
+            document.getElementById('stats-output').innerHTML = `
+                <div class="grid grid-cols-2 gap-2">
+                    <div><span class="font-bold">Total Nodes:</span> ${data.total_nodes}</div>
+                    <div><span class="font-bold">Total Edges:</span> ${data.total_edges}</div>
+                    <div><span class="font-bold">Avg Degree:</span> ${data.avg_degree}</div>
+                    <div><span class="font-bold">Max Degree:</span> ${data.max_degree}</div>
+                    <div><span class="font-bold">Min Degree:</span> ${data.min_degree}</div>
+                    <div><span class="font-bold">Density:</span> ${data.density}</div>
+                </div>
+            `;
+            document.getElementById('stats-output').classList.remove('hidden');
+        }
+
+        async function runBFS() {
+            const input = document.getElementById('bfs-input').value;
+            const data = await fetchAPI('bfs', 'POST', { start: input });
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            let html = `<p class="mb-2 text-gray-600">Visited ${data.total_visited} nodes:</p><div class="flex flex-wrap gap-2">`;
+            data.traversal.forEach(n => {
+                html += `<span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-xs">${n.name} (${n.id})</span>`;
+            });
+            html += `</div>`;
+            document.getElementById('bfs-output').innerHTML = html;
+            document.getElementById('bfs-output').classList.remove('hidden');
+        }
+
+        async function runDFS() {
+            const input = document.getElementById('dfs-input').value;
+            const data = await fetchAPI('dfs', 'POST', { start: input });
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            let html = `<p class="mb-2 text-gray-600">Visited ${data.total_visited} nodes:</p><div class="flex flex-wrap gap-2">`;
+            data.traversal.forEach(n => {
+                html += `<span class="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs">${n.name} (${n.id})</span>`;
+            });
+            html += `</div>`;
+            document.getElementById('dfs-output').innerHTML = html;
+            document.getElementById('dfs-output').classList.remove('hidden');
+        }
+
+        async function runShortestPath() {
+            const src = document.getElementById('sp-src').value;
+            const dst = document.getElementById('sp-dst').value;
+            const data = await fetchAPI('shortest_path', 'POST', { src, dst });
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            if (data.distance === -1) {
+                document.getElementById('sp-output').innerHTML = `<p class="text-red-600">${data.message}</p>`;
+            } else {
+                let html = `<p class="mb-2 text-gray-600">Distance: ${data.distance} hops</p><div class="flex flex-col gap-2">`;
+                data.path.forEach((n, i) => {
+                    html += `<div class="flex items-center gap-2"><span class="text-xs font-bold text-gray-500">${i+1}</span><span class="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs">${n.name} (${n.id})</span>${i < data.path.length - 1 ? '<i class="fas fa-arrow-right text-gray-400"></i>' : ''}</div>`;
+                });
+                html += `</div>`;
+                document.getElementById('sp-output').innerHTML = html;
+            }
+            document.getElementById('sp-output').classList.remove('hidden');
+        }
+
+        async function runPageRank() {
+            const data = await fetchAPI('pagerank');
+            let html = `<table class="w-full text-left text-xs"><thead><tr class="border-b"><th class="pb-1">Rank</th><th class="pb-1">Node</th><th class="pb-1">Score</th></tr></thead><tbody>`;
+            data.top.forEach((n, i) => {
+                html += `<tr class="border-b"><td class="py-1">${i+1}</td><td class="py-1">${n.name} (${n.id})</td><td class="py-1 font-mono">${n.score}</td></tr>`;
+            });
+            html += `</tbody></table>`;
+            document.getElementById('pagerank-output').innerHTML = html;
+            document.getElementById('pagerank-output').classList.remove('hidden');
+        }
+
+        async function runSuggestions() {
+            const input = document.getElementById('sugg-input').value;
+            const data = await fetchAPI('suggestions', 'POST', { node: input });
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            if (data.suggestions.length === 0) {
+                document.getElementById('sugg-output').innerHTML = `<p class="text-gray-600">No suggestions found.</p>`;
+            } else {
+                let html = `<table class="w-full text-left text-xs"><thead><tr class="border-b"><th class="pb-1">#</th><th class="pb-1">Suggested Friend</th><th class="pb-1">Mutual Friends</th></tr></thead><tbody>`;
+                data.suggestions.forEach((n, i) => {
+                    html += `<tr class="border-b"><td class="py-1">${i+1}</td><td class="py-1">${n.name} (${n.id})</td><td class="py-1 font-mono">${n.mutual}</td></tr>`;
+                });
+                html += `</tbody></table>`;
+                document.getElementById('sugg-output').innerHTML = html;
+            }
+            document.getElementById('sugg-output').classList.remove('hidden');
+        }
+
+        async function searchName() {
+            const query = document.getElementById('search-input').value;
+            const data = await fetchAPI('search_name', 'POST', { query });
+            if (data.results.length === 0) {
+                document.getElementById('search-output').innerHTML = `<p class="text-gray-600">No matches found.</p>`;
+            } else {
+                let html = `<table class="w-full text-left text-xs"><thead><tr class="border-b"><th class="pb-1">ID</th><th class="pb-1">Name</th><th class="pb-1">Degree</th></tr></thead><tbody>`;
+                data.results.forEach(n => {
+                    html += `<tr class="border-b"><td class="py-1">${n.id}</td><td class="py-1">${n.name}</td><td class="py-1 font-mono">${n.degree}</td></tr>`;
+                });
+                html += `</tbody></table>`;
+                document.getElementById('search-output').innerHTML = html;
+            }
+            document.getElementById('search-output').classList.remove('hidden');
+        }
+
+        async function runComponents() {
+            const data = await fetchAPI('components');
+            let html = `<p class="mb-2 text-gray-600">Total Components: <span class="font-bold">${data.count}</span></p><p class="mb-2 text-gray-600">Largest Component Size: <span class="font-bold">${data.largest_size}</span></p>`;
+            html += `<table class="w-full text-left text-xs"><thead><tr class="border-b"><th class="pb-1">Component</th><th class="pb-1">Sample Nodes</th></tr></thead><tbody>`;
+            data.components.forEach((comp, i) => {
+                html += `<tr class="border-b"><td class="py-1 font-bold">#${i+1}</td><td class="py-1">${comp.map(n => n.name + '(' + n.id + ')').join(', ')}</td></tr>`;
+            });
+            html += `</tbody></table>`;
+            document.getElementById('components-output').innerHTML = html;
+            document.getElementById('components-output').classList.remove('hidden');
+        }
+
+        async function runTopDegree() {
+            const k = document.getElementById('topk-input').value || 10;
+            const data = await fetchAPI('top_degree', 'POST', { k });
+            let html = `<table class="w-full text-left text-xs"><thead><tr class="border-b"><th class="pb-1">Rank</th><th class="pb-1">Node</th><th class="pb-1">Degree</th></tr></thead><tbody>`;
+            data.top.forEach((n, i) => {
+                html += `<tr class="border-b"><td class="py-1">${i+1}</td><td class="py-1">${n.name} (${n.id})</td><td class="py-1 font-mono">${n.degree}</td></tr>`;
+            });
+            html += `</tbody></table>`;
+            document.getElementById('topk-output').innerHTML = html;
+            document.getElementById('topk-output').classList.remove('hidden');
+        }
+
+        // Initialize degree chart
+        fetch('/api/stats').then(r => r.json()).then(data => {
+            // We need actual degree distribution; fetch from backend
+            fetch('/api/top_degree', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({k: 50}) })
+                .then(r => r.json())
+                .then(data => {
+                    const ctx = document.getElementById('degreeChart').getContext('2d');
+                    const labels = data.top.map(n => n.name + ' (' + n.id + ')');
+                    const values = data.top.map(n => n.degree);
+                    degreeChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Degree',
+                                data: values,
+                                backgroundColor: 'rgba(99, 102, 241, 0.7)',
+                                borderColor: 'rgb(99, 102, 241)',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            scales: { y: { beginAtZero: true } },
+                            plugins: { legend: { display: false } }
+                        }
+                    });
+                });
+        });
+    </script>
+</body>
+</html>
