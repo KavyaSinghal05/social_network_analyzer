@@ -379,5 +379,69 @@ def api_check_connection():
     })
 
 
+@app.route("/api/visualize", methods=["POST"])
+def api_visualize():
+    """Return nodes and edges for network visualization around a given node."""
+    data = request.get_json()
+    node = resolve_input(data.get("node", ""))
+    depth = int(data.get("depth", 1))
+    limit = int(data.get("limit", 150))
+
+    if node is None:
+        return jsonify({"error": "Node not found"}), 404
+
+    # BFS to collect nodes up to given depth
+    visited = {node}
+    current_level = [node]
+    all_nodes = [node]
+
+    for _ in range(depth):
+        next_level = []
+        for n in current_level:
+            for nb in adj[n]:
+                if nb not in visited:
+                    visited.add(nb)
+                    next_level.append(nb)
+                    all_nodes.append(nb)
+        current_level = next_level
+        if len(all_nodes) >= limit:
+            break
+
+    # Limit nodes
+    if len(all_nodes) > limit:
+        all_nodes = all_nodes[:limit]
+
+    node_set = set(all_nodes)
+
+    # Build edges within this subgraph
+    edges_out = []
+    seen_edges = set()
+    for u in all_nodes:
+        for v in adj[u]:
+            if v in node_set:
+                edge_key = tuple(sorted((u, v)))
+                if edge_key not in seen_edges:
+                    seen_edges.add(edge_key)
+                    edges_out.append({"from": u, "to": v})
+
+    # Build nodes output with styling
+    nodes_out = []
+    for n in all_nodes:
+        deg = len(adj[n])
+        node_obj = {
+            "id": n,
+            "label": f"{get_name(n)}\n({n})",
+            "title": f"{get_name(n)}\nDegree: {deg}",
+            "size": 10 + min(deg, 50),  # size based on degree
+            "color": "#6366f1",
+        }
+        if n == node:
+            node_obj["color"] = "#ef4444"  # root node = red
+            node_obj["size"] = 25
+        nodes_out.append(node_obj)
+
+    return jsonify({"nodes": nodes_out, "edges": edges_out})
+
+
 if __name__ == "__main__":
     app.run(debug=True, host="127.0.0.1", port=5000)
