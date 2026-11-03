@@ -275,6 +275,22 @@
             <div id="viz-info" class="mt-3 text-sm text-gray-600 hidden">
                 <span class="font-bold" id="viz-count"></span> nodes • <span class="font-bold" id="viz-edge-count"></span> connections
             </div>
+
+            <!-- Written Output: Nodes List -->
+            <div id="viz-nodes-output" class="mt-6 hidden result-box p-4 bg-gray-100 rounded-lg max-h-96 overflow-y-auto">
+                <h3 class="text-sm font-bold text-indigo-700 mb-2 flex items-center gap-2">
+                    <i class="fas fa-users"></i> Nodes in Network
+                </h3>
+                <div id="viz-nodes-list" class="text-xs grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1"></div>
+            </div>
+
+            <!-- Written Output: Edges/Connections List -->
+            <div id="viz-edges-output" class="mt-4 hidden result-box p-4 bg-gray-100 rounded-lg max-h-96 overflow-y-auto">
+                <h3 class="text-sm font-bold text-indigo-700 mb-2 flex items-center gap-2">
+                    <i class="fas fa-project-diagram"></i> Connections (Edges)
+                </h3>
+                <div id="viz-edges-list" class="text-xs grid grid-cols-1 sm:grid-cols-2 gap-1"></div>
+            </div>
         </div>
 
         <!-- Chart Section -->
@@ -469,6 +485,18 @@
         // === Network Visualization (vis-network) ===
         let network = null;
 
+        // Helper: convert node ID to name
+        function getNameFromId(id) {
+            // Try to extract from label if it contains name
+            // Fallback: just show ID if no name mapping available
+            const node = dataNodesCache.find(n => n.id === id);
+            if (node) return node.label.split('\n')[0];
+            return `Node ${id}`;
+        }
+
+        // Cache for node data
+        let dataNodesCache = [];
+
         async function runVisualize() {
             const nodeInput = document.getElementById('viz-node').value.trim();
             const depth = parseInt(document.getElementById('viz-depth').value);
@@ -504,6 +532,8 @@
                     msg.innerHTML = `<p class="text-red-500 text-lg">Error: ${data.error}</p>`;
                     return;
                 }
+
+                dataNodesCache = data.nodes;
 
                 const nodes = new vis.DataSet(data.nodes.map(n => ({
                     id: n.id,
@@ -567,6 +597,32 @@
                 document.getElementById('viz-count').textContent = data.nodes.length;
                 document.getElementById('viz-edge-count').textContent = data.edges.length;
 
+                // === Written Output: Nodes List ===
+                const nodesList = document.getElementById('viz-nodes-list');
+                nodesList.innerHTML = data.nodes.map(n => {
+                    const isRoot = n.color === '#ef4444';
+                    return `
+                        <div class="p-2 rounded bg-white border border-gray-200 ${isRoot ? 'border-red-300 bg-red-50' : ''} text-sm">
+                            <div class="font-bold text-gray-800 ${isRoot ? 'text-red-700' : ''}">${getNameFromId(n.id)}</div>
+                            <div class="text-xs text-gray-500">ID: ${n.id} • Degree: ${Math.round(n.size - 10)}</div>
+                        </div>
+                    `;
+                }).join('');
+                document.getElementById('viz-nodes-output').classList.remove('hidden');
+
+                // === Written Output: Edges List ===
+                const edgesList = document.getElementById('viz-edges-list');
+                edgesList.innerHTML = data.edges.map(e => `
+                    <div class="p-2 rounded bg-white border border-gray-200 text-sm border-b">
+                        <div class="flex items-center justify-between">
+                            <span class="font-medium text-gray-700">${getNameFromId(e.from)} (${e.from})</span>
+                            <span class="text-xs text-indigo-600 font-bold">↔</span>
+                            <span class="font-medium text-gray-700">${getNameFromId(e.to)} (${e.to})</span>
+                        </div>
+                    </div>
+                `).join('');
+                document.getElementById('viz-edges-output').classList.remove('hidden');
+
             } catch (err) {
                 msg.innerHTML = `<p class="text-red-500 text-lg">Failed to load network: ${err.message}</p>`;
             }
@@ -577,6 +633,7 @@
                 network.destroy();
                 network = null;
             }
+            dataNodesCache = [];
             const container = document.getElementById('viz-container');
             container.innerHTML = `
                 <div id="viz-msg" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
@@ -585,6 +642,8 @@
                 </div>
             `;
             document.getElementById('viz-info').classList.add('hidden');
+            document.getElementById('viz-nodes-output').classList.add('hidden');
+            document.getElementById('viz-edges-output').classList.add('hidden');
         }
     </script>
 </body>
