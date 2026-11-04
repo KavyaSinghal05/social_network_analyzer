@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social Network Graph Analyzer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f8fafc;
+            color: #1e293b;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        header {
+            background: #1e293b;
+            color: #fff;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        header h1 { font-size: 1.5rem; margin: 0; }
+        header .subtitle { font-size: 0.875rem; opacity: 0.8; margin-top: 4px; }
+
+        .bento-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+        @media (min-width: 768px) { .bento-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (min-width: 1200px) { .bento-grid { grid-template-columns: repeat(4, 1fr); } }
+
+        .card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+        }
+        .card h3 {
+            font-size: 0.875rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748b;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .card h3 i { color: #3b82f6; }
+
+        .metric { font-size: 2rem; font-weight: 800; color: #0f172a; margin-bottom: 0.25rem; }
+        .meta { font-size: 0.75rem; color: #64748b; }
+
+        .hero { grid-column: span 2; grid-row: span 2; }
+
+        .form-row { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 16px; }
+        @media (min-width: 768px) { .form-row { grid-template-columns: repeat(3, 1fr); } }
+        label { font-size: 0.75rem; font-weight: 600; color: #64748b; margin-bottom: 6px; display: block; }
+        input, select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            background: #fff;
+        }
+        input:focus, select:focus { outline: none; border-color: #3b82f6; }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: #3b82f6; color: #fff; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-secondary { background: #f1f5f9; color: #334155; }
+        .btn-secondary:hover { background: #e2e8f0; }
+        .btn-group { display: flex; gap: 10px; margin-bottom: 16px; }
+
+        #viz-container {
+            width: 100%;
+            height: 500px;
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            background: #f8fafc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            margin-bottom: 12px;
+        }
+        #viz-msg { text-align: center; }
+        #viz-msg i { font-size: 2rem; margin-bottom: 8px; opacity: 0.5; }
+
+        .viz-stats { display: flex; gap: 16px; font-size: 0.875rem; color: #64748b; }
+
+        .output-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1rem;
+            margin-top: 16px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .output-box h4 {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #3b82f6;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .nodes-list { display: grid; grid-template-columns: 1fr; gap: 8px; }
+        @media (min-width: 640px) { .nodes-list { grid-template-columns: repeat(2, 1fr); } }
+        .node-item {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 0.8rem;
+        }
+        .node-item .name { font-weight: 700; color: #0f172a; }
+        .node-item .meta { font-size: 0.7rem; color: #64748b; margin-top: 2px; }
+        .node-item.root { border-left: 4px solid #ef4444; background: #fef2f2; }
+
+        .edges-list { display: grid; grid-template-columns: 1fr; gap: 6px; }
+        @media (min-width: 640px) { .edges-list { grid-template-columns: repeat(2, 1fr); } }
+        .edge-item {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .edge-item .arrow { color: #3b82f6; font-weight: 700; font-size: 0.7rem; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        th { text-align: left; color: #64748b; font-size: 0.7rem; padding: 6px 8px; border-bottom: 1px solid #e2e8f0; }
+        td { padding: 6px 8px; border-bottom: 1px solid #f1f5f9; }
+        tr:hover td { background: #f8fafc; }
+
+        .chart-wrap { width: 100%; height: 200px; }
+        .hidden { display: none !important; }
+        .text-success { color: #16a34a; }
+        .text-info { color: #3b82f6; }
+        .font-mono { font-family: ui-monospace, SFMono-Regular, monospace; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>Social Network Graph Analyzer</h1>
+                <div class="subtitle">CSR Graph • SNAP Facebook Dataset • {{ total_nodes }} Nodes • {{ total_edges }} Edges</div>
+            </div>
+            <div style="font-size: 0.875rem; opacity: 0.8;">Vercel Deployment</div>
+        </header>
+
+        <main class="bento-grid" role="region" aria-label="Dashboard metrics and graph analysis">
+
+            <div class="card">
+                <h3><i class="fas fa-users"></i> Total Nodes</h3>
+                <div class="metric text-info">{{ total_nodes }}</div>
+                <div class="meta">Unique people in network</div>
+            </div>
+            <div class="card">
+                <h3><i class="fas fa-link"></i> Total Edges</h3>
+                <div class="metric text-info">{{ total_edges }}</div>
+                <div class="meta">Undirected friendships</div>
+            </div>
+            <div class="card">
+                <h3><i class="fas fa-signal"></i> Avg Degree</h3>
+                <div class="metric text-success">{{ avg_degree }}</div>
+                <div class="meta">Friends per person</div>
+            </div>
+            <div class="card">
+                <h3><i class="fas fa-rank-star"></i> Max Degree</h3>
+                <div class="metric text-warning">{{ max_degree }}</div>
+                <div class="meta">{{ max_node }}</div>
+            </div>
+            <div class="card">
+                <h3><i class="fas fa-layer-group"></i> Components</h3>
+                <div class="metric text-info">1</div>
+                <div class="meta">Connected component</div>
+            </div>
+            <div class="card">
+                <h3><i class="fas fa-chart-pie"></i> Density</h3>
+                <div class="metric text-info">0.0108</div>
+                <div class="meta">Network density</div>
+            </div>
+
+            <div class="card">
+                <h3><i class="fas fa-sitemap"></i> BFS Traversal</h3>
+                <p class="meta" style="margin-bottom: 1rem;">Breadth-First Search from any node</p>
+                <div class="form-row">
+                    <label>Node ID or Name</label>
+                    <input type="text" id="bfs-input" placeholder="e.g. 0 or Divya Choudhary">
+                </div>
+                <button class="btn btn-primary" onclick="runBFS()" style="width: 100%;">Run BFS</button>
+                <div id="bfs-output" class="output-box hidden" style="margin-top: 1rem;"></div>
+            </div>
+
+            <div class="card">
+                <h3><i class="fas fa-tree"></i> DFS Traversal</h3>
+                <p class="meta" style="margin-bottom: 1rem;">Iterative Depth-First Search</p>
+                <div class="form-row">
+                    <label>Node ID or Name</label>
+                    <input type="text" id="dfs-input" placeholder="e.g. 0 or Divya Choudhary">
+                </div>
+                <button class="btn btn-primary" onclick="runDFS()" style="width: 100%;">Run DFS</button>
+                <div id="dfs-output" class="output-box hidden" style="margin-top: 1rem;"></div>
+            </div>
+
+            <div class="card">
+                <h3><i class="fas fa-route"></i> Shortest Path</h3>
+                <p class="meta" style="margin-bottom: 1rem;">Bidirectional BFS between two nodes</p>
+                <div class="form-row">
+                    <label>Source</label>
+                    <input type="text" id="sp-src" placeholder="Source node">
+                </div>
+                <div class="form-row">
+                    <label>Destination</label>
+                    <input type="text" id="sp-dst" placeholder="Destination node">
+                </div>
+                <button class="btn btn-primary" onclick="runShortestPath()" style="width: 100%;">Find Path</button>
+                <div id="sp-output" class="output-box hidden" style="margin-top: 1rem;"></div>
+            </div>
+
+            <div class="card">
+                <h3><i class="fas fa-chart-line"></i> PageRank</h3>
+                <p class="meta" style="margin-bottom: 1rem;">Top 10 nodes by centrality score</p>
+                <button class="btn btn-primary" onclick="runPageRank()" style="width: 100%;">Compute PageRank</button>
+                <div id="pagerank-output" class="output-box hidden" style="margin-top: 1rem;"></div>
+            </div>
+
+            <div class="card hero">
+                <h3><i class="fas fa-project-diagram"></i> Network Visualization</h3>
+                <p class="meta" style="margin-bottom: 1rem;">Visible connections between people — graph + written list</p>
+
+                <div class="form-row">
+                    <label>Center Node</label>
+                    <input type="text" id="viz-node" value="0" placeholder="ID or name">
+                </div>
+                <div class="form-row">
+                    <label>Depth</label>
+                    <select id="viz-depth">
+                        <option value="1">1 hop</option>
+                        <option value="2" selected>2 hops</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <label>Max Nodes</label>
+                    <input type="number" id="viz-limit" value="150" min="10" max="500">
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="runVisualize()">Load Network</button>
+                    <button class="btn btn-secondary" onclick="clearNetwork()">Clear</button>
+                </div>
+
+                <div id="viz-container">
+                    <div id="viz-msg">
+                        <i class="fas fa-network-wired"></i>
+                        <div style="margin-top: 8px;">Enter a node and click <b>Load Network</b></div>
+                    </div>
+                </div>
+
+                <div class="viz-stats">
+                    <span><b>Nodes:</b> <span id="viz-count">0</span></span>
+                    <span><b>Connections:</b> <span id="viz-edge-count">0</span></span>
+                </div>
+
+                <div id="viz-nodes-output" class="output-box hidden">
+                    <h4><i class="fas fa-users"></i> Nodes in Network</h4>
+                    <div id="viz-nodes-list" class="nodes-list"></div>
+                </div>
+
+                <div id="viz-edges-output" class="output-box hidden">
+                    <h4><i class="fas fa-project-diagram"></i> Connections (Edges)</h4>
+                    <div id="viz-edges-list" class="edges-list"></div>
+                </div>
+            </div>
+
+            <div class="card chart-card">
+                <h3><i class="fas fa-chart-bar"></i> Degree Distribution</h3>
+                <div class="chart-wrap">
+                    <canvas id="degreeChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3><i class="fas fa-layer-group"></i> Components</h3>
+                <p class="meta" style="margin-bottom: 1rem;">Union-Find component analysis</p>
+                <button class="btn btn-primary" onclick="runComponents()" style="width: 100%;">Analyze</button>
+                <div id="components-output" class="output-box hidden" style="margin-top: 1rem;"></div>
+            </div>
+
+            <div class="card">
+                <h3><i class="fas fa-sort-amount-down"></i> Top Degree</h3>
+                <p class="meta" style="margin-bottom: 1rem;">Highest degree centrality</p>
+                <div class="form-row">
+                    <label>K (top nodes)</label>
+                    <input type="number" id="topk-input" value="10" min="1" max="500">
+                </div>
+                <button class="btn btn-primary" onclick="runTopDegree()" style="width: 100%;">Get Top Nodes</button>
+                <div id="topk-output" class="output-box hidden" style="margin-top: 1rem;"></div>
+            </div>
+
+            <div class="card">
+                <h3><i class="fas fa-search"></i> Search by Name</h3>
+                <p class="meta" style="margin-bottom: 1rem;">Partial case-insensitive name search</p>
+                <div class="form-row">
+                    <label>Search Query</label>
+                    <input type="text" id="search-input" placeholder="Type a name">
+                </div>
+                <button class="btn btn-primary" onclick="searchName()" style="width: 100%;">Search</button>
+                <div id="search-output" class="output-box hidden" style="margin-top: 1rem;"></div>
+            </div>
+
+            <div class="card">
+                <h3><i class="fas fa-users"></i> Friend Suggestions</h3>
+                <p class="meta" style="margin-bottom: 1rem;">2-hop recommendations with mutual count</p>
+                <div class="form-row">
+                    <label>Node ID or Name</label>
+                    <input type="text" id="sugg-input" placeholder="e.g. 0 or Divya Choudhary">
+                </div>
+                <button class="btn btn-primary" onclick="runSuggestions()" style="width: 100%;">Get Suggestions</button>
+                <div id="sugg-output" class="output-box hidden" style="margin-top: 1rem;"></div>
+            </div>
+
+            <div class="card" style="grid-column: span 2;">
+                <h3><i class="fas fa-list"></i> All People (Verification)</h3>
+                <p class="meta" style="margin-bottom: 1rem;">Complete list of all {{ total_nodes }} people in the network with ID, name, and degree</p>
+                <div class="form-row">
+                    <label>Search people</label>
+                    <input type="text" id="all-people-search" placeholder="Type name or ID to filter..." onkeyup="filterPeople()">
+                </div>
+                <div class="output-box" style="margin-top: 0; max-height: 400px;">
+                    <table id="all-people-table" style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left; padding: 8px; border-bottom: 2px solid #e2e8f0; color: #64748b; font-size: 0.7rem;">ID</th>
+                                <th style="text-align: left; padding: 8px; border-bottom: 2px solid #e2e8f0; color: #64748b; font-size: 0.7rem;">Name</th>
+                                <th style="text-align: left; padding: 8px; border-bottom: 2px solid #e2e8f0; color: #64748b; font-size: 0.7rem;">Degree</th>
+                            </tr>
+                        </thead>
+                        <tbody id="all-people-body"></tbody>
+                    </table>
+                </div>
+                <div id="all-people-count" class="meta" style="margin-top: 8px; text-align: right;"></div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        async function fetchAPI(endpoint, method = 'GET', body = null) {
+            const opts = { method, headers: { 'Content-Type': 'application/json' } };
+            if (body) opts.body = JSON.stringify(body);
+            const res = await fetch('/api/' + endpoint, opts);
+            return res.json();
+        }
+
+        function showOutput(id, html) {
+            const el = document.getElementById(id);
+            el.innerHTML = html;
+            el.classList.remove('hidden');
+        }
+
+        async function runBFS() {
+            const d = await fetchAPI('bfs', 'POST', { start: document.getElementById('bfs-input').value });
+            if (d.error) { alert(d.error); return; }
+            showOutput('bfs-output', `
+                <p class="meta mb-2">Visited <b>${d.total_visited}</b> nodes</p>
+                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                    ${d.traversal.map(n => `<span style="background:#eff6ff; color:#1e40af; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; border: 1px solid #bfdbfe;">${n.name} (${n.id})</span>`).join('')}
+                </div>
+            `);
+        }
+        async function runDFS() {
+            const d = await fetchAPI('dfs', 'POST', { start: document.getElementById('dfs-input').value });
+            if (d.error) { alert(d.error); return; }
+            showOutput('dfs-output', `
+                <p class="meta mb-2">Visited <b>${d.total_visited}</b> nodes</p>
+                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                    ${d.traversal.map(n => `<span style="background:#f0fdf4; color:#166534; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; border: 1px solid #bbf7d0;">${n.name} (${n.id})</span>`).join('')}
+                </div>
+            `);
+        }
+        async function runShortestPath() {
+            const d = await fetchAPI('shortest_path', 'POST', {
+                src: document.getElementById('sp-src').value,
+                dst: document.getElementById('sp-dst').value
+            });
+            if (d.error) { alert(d.error); return; }
+            if (d.distance === -1) {
+                showOutput('sp-output', `<p style="color:#dc2626;">${d.message}</p>`);
+            } else {
+                let html = `<p class="meta mb-2">Distance: <b>${d.distance}</b> hops</p><div style="display: flex; flex-direction: column; gap: 8px;">`;
+                d.path.forEach((n, i) => {
+                    html += `<div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="font-size: 0.7rem; color:#64748b;">${i+1}</span>
+                        <span style="background:#eff6ff; color:#1e40af; padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; border: 1px solid #bfdbfe;">${n.name} (${n.id})</span>
+                        ${i < d.path.length - 1 ? '<span style="color:#3b82f6; font-weight: 700;">&#8594;</span>' : ''}
+                    </div>`;
+                });
+                html += `</div>`;
+                showOutput('sp-output', html);
+            }
+        }
+        async function runPageRank() {
+            const d = await fetchAPI('pagerank');
+            let html = `<table><thead><tr><th>Rank</th><th>Node</th><th>Score</th></tr></thead><tbody>`;
+            d.top.forEach((n, i) => {
+                html += `<tr><td>${i+1}</td><td>${n.name} (${n.id})</td><td class="font-mono text-success">${n.score}</td></tr>`;
+            });
+            html += `</tbody></table>`;
+            showOutput('pagerank-output', html);
+        }
+        async function runSuggestions() {
+            const d = await fetchAPI('suggestions', 'POST', { node: document.getElementById('sugg-input').value });
+            if (d.error) { alert(d.error); return; }
+            if (d.suggestions.length === 0) {
+                showOutput('sugg-output', `<p style="color:#64748b;">No suggestions found.</p>`);
+            } else {
+                let html = `<table><thead><tr><th>#</th><th>Suggested Friend</th><th>Mutual</th></tr></thead><tbody>`;
+                d.suggestions.forEach((n, i) => {
+                    html += `<tr><td>${i+1}</td><td>${n.name} (${n.id})</td><td class="font-mono text-success">${n.mutual}</td></tr>`;
+                });
+                html += `</tbody></table>`;
+                showOutput('sugg-output', html);
+            }
+        }
+        async function searchName() {
+            const d = await fetchAPI('search_name', 'POST', { query: document.getElementById('search-input').value });
+            if (d.results.length === 0) {
+                showOutput('search-output', `<p style="color:#64748b;">No matches found.</p>`);
+            } else {
+                let html = `<table><thead><tr><th>ID</th><th>Name</th><th>Degree</th></tr></thead><tbody>`;
+                d.results.forEach(n => {
+                    html += `<tr><td>${n.id}</td><td>${n.name}</td><td class="font-mono text-success">${n.degree}</td></tr>`;
+                });
+                html += `</tbody></table>`;
+                showOutput('search-output', html);
+            }
+        }
+        async function runComponents() {
+            const d = await fetchAPI('components');
+            showOutput('components-output', `
+                <p class="meta mb-2">Total Components: <b>${d.count}</b> | Largest: <b>${d.largest_size}</b></p>
+                <table><thead><tr><th>Component</th><th>Sample Nodes</th></tr></thead><tbody>
+                ${d.components.map((c, i) => `<tr><td>#${i+1}</td><td>${c.map(x => x.name + ' (' + x.id + ')').join(', ')}</td></tr>`).join('')}
+                </tbody></table>
+            `);
+        }
+        async function runTopDegree() {
+            const k = document.getElementById('topk-input').value || 10;
+            const d = await fetchAPI('top_degree', 'POST', { k });
+            let html = `<table><thead><tr><th>Rank</th><th>Node</th><th>Degree</th></tr></thead><tbody>`;
+            d.top.forEach((n, i) => {
+                html += `<tr><td>${i+1}</td><td>${n.name} (${n.id})</td><td class="font-mono text-success">${n.degree}</td></tr>`;
+            });
+            html += `</tbody></table>`;
+            showOutput('topk-output', html);
+        }
+
+        fetch('/api/top_degree', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ k: 30 })
+        }).then(r => r.json()).then(data => {
+            const ctx = document.getElementById('degreeChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.top.map(n => n.name + ' (' + n.id + ')'),
+                    datasets: [{
+                        label: 'Degree',
+                        data: data.top.map(n => n.degree),
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        });
+
+        let network = null;
+        let dataNodesCache = [];
+
+        function getNameFromId(id) {
+            const node = dataNodesCache.find(n => n.id === id);
+            return node ? node.label.split('\n')[0] : `Node ${id}`;
+        }
+
+        async function runVisualize() {
+            const d = await fetchAPI('visualize', 'POST', {
+                node: document.getElementById('viz-node').value,
+                depth: parseInt(document.getElementById('viz-depth').value),
+                limit: parseInt(document.getElementById('viz-limit').value)
+            });
+            if (d.error) { alert(d.error); return; }
+
+            dataNodesCache = d.nodes;
+            const container = document.getElementById('viz-container');
+            container.innerHTML = '<div id="viz-network" style="width:100%; height:100%"></div>';
+
+            const nodes = new vis.DataSet(d.nodes.map(n => ({
+                id: n.id, label: n.label, title: n.title, size: n.size,
+                color: n.color, font: { size: 12, color: '#1e293b', strokeWidth: 2, strokeColor: '#fff' }
+            })));
+            const edges = new vis.DataSet(d.edges);
+
+            network = new vis.Network(document.getElementById('viz-network'), { nodes, edges }, {
+                nodes: { shape: 'dot', borderWidth: 2, shadow: true, font: { size: 12, color: '#1e293b', strokeWidth: 2, strokeColor: '#fff' } },
+                edges: { width: 1.5, color: '#94a3b8', smooth: { type: 'continuous' } },
+                physics: { enabled: true, solver: 'forceAtlas2Based',
+                    forceAtlas2Based: { gravitationalConstant: -50, centralGravity: 0.01, springLength: 100, springConstant: 0.08 },
+                    stabilization: { iterations: 100 } },
+                interaction: { hover: true, navigationButtons: true, keyboard: true },
+                layout: { randomSeed: 42 }
+            });
+
+            document.getElementById('viz-count').textContent = d.nodes.length;
+            document.getElementById('viz-edge-count').textContent = d.edges.length;
+
+            const nl = document.getElementById('viz-nodes-list');
+            nl.innerHTML = d.nodes.map(n => {
+                const isRoot = n.color === '#ef4444';
+                return `<div class="node-item ${isRoot ? 'root' : ''}">
+                    <div class="name">${getNameFromId(n.id)}</div>
+                    <div class="meta">ID: ${n.id} • Degree: ${Math.round(n.size - 10)}</div>
+                </div>`;
+            }).join('');
+            document.getElementById('viz-nodes-output').classList.remove('hidden');
+
+            const el = document.getElementById('viz-edges-list');
+            el.innerHTML = d.edges.map(e => `
+                <div class="edge-item">
+                    <span>${getNameFromId(e.from)} (${e.from})</span>
+                    <span class="arrow">&#8594;</span>
+                    <span>${getNameFromId(e.to)} (${e.to})</span>
+                </div>`).join('');
+            document.getElementById('viz-edges-output').classList.remove('hidden');
+        }
+
+        function clearNetwork() {
+            if (network) { network.destroy(); network = null; }
+            dataNodesCache = [];
+            document.getElementById('viz-container').innerHTML = `
+                <div id="viz-msg">
+                    <i class="fas fa-network-wired"></i>
+                    <div style="margin-top: 8px;">Enter a node and click <b>Load Network</b></div>
+                </div>`;
+            document.getElementById('viz-nodes-output').classList.add('hidden');
+            document.getElementById('viz-edges-output').classList.add('hidden');
+        }
+
+        let allPeopleData = [];
+
+        async function loadAllPeople() {
+            const d = await fetchAPI('all_nodes');
+            allPeopleData = d.nodes;
+            renderPeopleTable(allPeopleData);
+            document.getElementById('all-people-count').textContent = `Showing ${d.total} people`;
+        }
+
+        function renderPeopleTable(data) {
+            const tbody = document.getElementById('all-people-body');
+            tbody.innerHTML = data.map(p => `
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #f1f5f9; font-family: monospace; font-size: 0.8rem;">${p.id}</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #f1f5f9; font-size: 0.8rem;">${p.name}</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #f1f5f9; font-family: monospace; font-size: 0.8rem; color: #16a34a; font-weight: 600;">${p.degree}</td>
+                </tr>
+            `).join('');
+        }
+
+        function filterPeople() {
+            const q = document.getElementById('all-people-search').value.toLowerCase();
+            const filtered = allPeopleData.filter(p =>
+                p.name.toLowerCase().includes(q) ||
+                p.id.toString().includes(q)
+            );
+            renderPeopleTable(filtered);
+            document.getElementById('all-people-count').textContent = `Showing ${filtered.length} of ${allPeopleData.length} people`;
+        }
+
+        loadAllPeople();
+    </script>
+</body>
+</html>
