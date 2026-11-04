@@ -443,5 +443,18 @@ def api_visualize():
     return jsonify({"nodes": nodes_out, "edges": edges_out})
 
 
+@app.route("/api/all_nodes", methods=["GET"])
+def api_all_nodes():
+    """Return all nodes with their names and degrees for verification."""
+    nodes_list = []
+    for n in sorted(nodes):
+        nodes_list.append({
+            "id": n,
+            "name": get_name(n),
+            "degree": len(adj[n])
+        })
+    return jsonify({"nodes": nodes_list, "total": len(nodes_list)})
+
+
 if __name__ == "__main__":
     app.run(debug=True, host="127.0.0.1", port=5000)
