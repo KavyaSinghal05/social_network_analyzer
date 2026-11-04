@@ -10,8 +10,16 @@ import heapq
 
 app = Flask(__name__, template_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates'))
 
-DATA_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'facebook_combined.txt')
-NAMES_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'names.txt')
+# Try multiple paths for data files (Vercel serverless)
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_PATH = os.path.join(project_root, 'data', 'facebook_combined.txt')
+NAMES_PATH = os.path.join(project_root, 'data', 'names.txt')
+
+# Fallback: check if data is in api/data or root/data
+if not os.path.exists(DATA_PATH):
+    DATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'facebook_combined.txt')
+if not os.path.exists(NAMES_PATH):
+    NAMES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'names.txt')
 
 # Global graph data
 adj = defaultdict(list)
