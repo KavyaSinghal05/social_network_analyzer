@@ -3,309 +3,428 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Social Network Graph Analyzer — Web Dashboard</title>
+    <title>Social Network Graph Analyzer — Bento Grid Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<link href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.css" rel="stylesheet" type="text/css" />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js"></script>
     <style>
-        .glass {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
+        /* Dark Graphite Surface palette per document specification */
+        :root {
+            --canvas: #09090b;
+            --surface: #121215;
+            --text: #FFFFFF;
+            --muted: #A1A1AA;
+            --border: #27272A;
+            --radius: 16px;        /* rounded-2xl */
+            --gap: 12px;           /* gap-3, coupled: 0.5R <= G <= 1.0R */
+            --accent: #FAD4C0;     /* Warm Bento Primary */
+            --accent-secondary: #80A1C1;
+            --success: #16A34A;
+            --warning: #D97706;
         }
-        .feature-card:hover {
-            transform: translateY(-4px);
-            transition: all 0.3s ease;
+
+        body {
+            background-color: var(--canvas);
+            color: var(--text);
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
+
+        /* Bento Grid: display: grid, never Flexbox for 2D tile layout */
+        .bento-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            grid-auto-rows: minmax(180px, auto);
+            gap: var(--gap);
+        }
+
+        @media (min-width: 600px) {
+            .bento-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (min-width: 900px) {
+            .bento-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        /* Legal footprints: col-span / row-span on a 4-unit bento over 12-col grid */
+        .span-1x1 { grid-column: span 1; grid-row: span 1; }   /* 1:1 KPI card */
+        .span-2x1 { grid-column: span 2; grid-row: span 1; }   /* 2:1 wide chart */
+        .span-1x2 { grid-column: span 1; grid-row: span 2; }   /* 1:2 vertical feed */
+        .span-2x2 { grid-column: span 2; grid-row: span 2; }   /* 1:1 hero view */
+
+        @media (min-width: 900px) {
+            .span-1x1 { grid-column: span 3; grid-row: span 1; }
+            .span-2x1 { grid-column: span 6; grid-row: span 1; }
+            .span-1x2 { grid-column: span 3; grid-row: span 2; }
+            .span-2x2 { grid-column: span 6; grid-row: span 2; }
+        }
+
+        /* Card: single conceptual unit, reading order metric → title → meta → action */
+        .bento-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .bento-card:hover {
+            border-color: var(--accent-secondary);
+            transform: translateY(-2px);
+        }
+
+        .bento-card:focus-visible {
+            outline: 2px solid #0066CC;
+            outline-offset: 2px;
+        }
+
+        .bento-card.primary { border-color: var(--accent); }
+
+        .metric-primary { font-size: 2rem; font-weight: 700; letter-spacing: -0.025em; }
+        .metric-delta { font-size: 0.875rem; font-weight: 600; }
+        .card-title { font-size: 0.875rem; font-weight: 600; margin-top: 0.5rem; }
+        .card-meta { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+        .card-action { font-size: 0.875rem; font-weight: 600; color: var(--accent-secondary); margin-top: 1rem; }
+
+        /* Result boxes */
         .result-box {
-            animation: slideIn 0.3s ease-out;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1rem;
+            color: var(--text);
         }
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+
+        /* Accessibility: skip navigation */
+        .skip-link {
+            position: absolute;
+            left: -9999px;
+            top: auto;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            z-index: -9999;
         }
+        .skip-link:focus {
+            position: fixed;
+            left: 0.5rem;
+            top: 0.5rem;
+            width: auto;
+            height: auto;
+            padding: 0.5rem 1rem;
+            background: var(--accent);
+            color: #000;
+            z-index: 9999;
+            border-radius: var(--radius);
+        }
+
+        /* Chart container */
+        .chart-wrap { width: 100%; height: 240px; }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-900 min-h-screen">
+<body class="min-h-screen p-4 md:p-6">
+
+    <!-- Skip navigation (WCAG) -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
 
     <!-- Navbar -->
-    <nav class="bg-indigo-700 text-white shadow-lg sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+    <nav class="bg-surface border-b border-border p-4 sticky top-0 z-50 shadow-sm" aria-label="Main navigation">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-indigo-400 rounded-lg flex items-center justify-center font-bold text-xl">SN</div>
-                <h1 class="text-xl font-bold tracking-tight">Social Network Analyzer</h1>
+                <div class="w-8 h-8 bg-accent text-gray-900 rounded-lg flex items-center justify-center font-bold text-sm">SN</div>
+                <h1 class="text-lg font-bold tracking-tight">Social Network Analyzer</h1>
             </div>
-            <div class="text-sm text-indigo-100">CSR Graph • SNAP Facebook Dataset</div>
+            <div class="text-xs text-muted uppercase tracking-wider">CSR Graph • SNAP Facebook Dataset</div>
         </div>
     </nav>
 
-    <!-- Header Stats -->
-    <div class="max-w-7xl mx-auto px-4 py-6">
-        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-                <div class="text-gray-500 text-xs font-semibold uppercase tracking-wider">Total Nodes</div>
-                <div class="text-3xl font-bold mt-1">{{ total_nodes }}</div>
+    <!-- Main Content: Bento Grid -->
+    <main id="main-content" class="max-w-7xl mx-auto px-4 py-6" role="region" aria-label="Dashboard metrics and graph analysis">
+
+        <!-- Header Stats Row (delta-first KPI cards, 1x1 footprint) -->
+        <div class="bento-grid mb-6">
+            <div class="span-1x1 bento-card primary" aria-label="Total Nodes: {{ total_nodes }} people in the social network">
+                <div class="metric-primary text-accent">{{ total_nodes }}</div>
+                <div class="card-title">Total Nodes</div>
+                <div class="card-meta">Unique people in network</div>
             </div>
-            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-                <div class="text-gray-500 text-xs font-semibold uppercase tracking-wider">Total Edges</div>
-                <div class="text-3xl font-bold mt-1 text-indigo-600">{{ total_edges }}</div>
+            <div class="span-1x1 bento-card" aria-label="Total Edges: {{ total_edges }} friendships connecting the network">
+                <div class="metric-primary text-accent-secondary">{{ total_edges }}</div>
+                <div class="card-title">Total Edges</div>
+                <div class="card-meta">Undirected friendships</div>
             </div>
-            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-                <div class="text-gray-500 text-xs font-semibold uppercase tracking-wider">Avg Degree</div>
-                <div class="text-3xl font-bold mt-1 text-green-600">{{ avg_degree }}</div>
+            <div class="span-1x1 bento-card" aria-label="Average Degree: {{ avg_degree }} friends per person">
+                <div class="metric-primary text-success">{{ avg_degree }}</div>
+                <div class="card-title">Avg Degree</div>
+                <div class="card-meta">Friends per person</div>
             </div>
-            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-                <div class="text-gray-500 text-xs font-semibold uppercase tracking-wider">Max Degree</div>
-                <div class="text-3xl font-bold mt-1 text-red-600">{{ max_degree }}</div>
+            <div class="span-1x1 bento-card" aria-label="Maximum Degree: {{ max_degree }} connections for {{ max_node }}">
+                <div class="metric-primary text-warning">{{ max_degree }}</div>
+                <div class="card-title">Max Degree</div>
+                <div class="card-meta">{{ max_node }}</div>
             </div>
-            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-                <div class="text-gray-500 text-xs font-semibold uppercase tracking-wider">Min Degree</div>
-                <div class="text-3xl font-bold mt-1 text-yellow-600">{{ min_degree }}</div>
+            <div class="span-1x1 bento-card" aria-label="Minimum Degree: {{ min_degree }} connections for {{ min_node }}">
+                <div class="metric-primary text-muted">{{ min_degree }}</div>
+                <div class="card-title">Min Degree</div>
+                <div class="card-meta">{{ min_node }}</div>
             </div>
-            <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-                <div class="text-gray-500 text-xs font-semibold uppercase tracking-wider">Density</div>
-                <div class="text-3xl font-bold mt-1 text-purple-600">0.0108</div>
+            <div class="span-1x1 bento-card" aria-label="Graph Density: measure of how crowded the network is">
+                <div class="metric-primary text-accent">0.0108</div>
+                <div class="card-title">Density</div>
+                <div class="card-meta">Edges / possible edges</div>
             </div>
         </div>
-    </div>
 
-    <!-- Feature Grid -->
-    <div class="max-w-7xl mx-auto px-4 pb-12">
-        <div class="flex flex-col md:flex-row gap-6">
-            
-            <!-- Left Column -->
-            <div class="flex-1 flex flex-col gap-6">
-                
-                <!-- Graph Statistics -->
-                <div class="glass rounded-xl shadow-sm border border-gray-200 p-6 feature-card">
-                    <div class="flex items-center gap-3 mb-6">
-                        <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-chart-bar"></i>
-                        </div>
-                        <h2 class="text-lg font-bold">Graph Statistics</h2>
+        <!-- Feature Cards Row -->
+        <div class="bento-grid mb-6">
+
+            <!-- Graph Statistics (1x2 vertical) -->
+            <div class="span-1x2 bento-card" aria-label="Graph Statistics: comprehensive graph metrics computed from CSR representation">
+                <div class="flex items-center gap-2 mb-4">
+                    <div class="w-6 h-6 bg-accent text-gray-900 rounded flex items-center justify-center text-xs font-bold">
+                        <i class="fas fa-chart-bar"></i>
                     </div>
-                    <p class="text-gray-600 text-sm mb-6">View comprehensive graph metrics computed from the CSR representation.</p>
-                    <button onclick="loadStats()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition-colors">
-                        Load Statistics
-                    </button>
-                    <div id="stats-output" class="mt-4 hidden result-box p-4 bg-gray-100 rounded-lg text-sm font-mono">
-                    </div>
+                    <h2 class="card-title text-base">Graph Statistics</h2>
                 </div>
-
-                <!-- BFS Traversal -->
-                <div class="glass rounded-xl shadow-sm border border-gray-200 p-6 feature-card">
-                    <div class="flex items-center gap-3 mb-6">
-                        <div class="w-10 h-10 bg-green-100 text-green-600 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-sitemap"></i>
-                        </div>
-                        <h2 class="text-lg font-bold">BFS Traversal</h2>
-                    </div>
-                    <p class="text-gray-600 text-sm mb-6">Breadth-First Search from any node (ID or name).</p>
-                    <input type="text" id="bfs-input" placeholder="Enter node ID or name" class="w-full p-2 border border-gray-300 rounded-lg mb-3 text-sm">
-                    <button onclick="runBFS()" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-medium transition-colors">
-                        Run BFS
-                    </button>
-                    <div id="bfs-output" class="mt-4 hidden result-box p-4 bg-gray-100 rounded-lg max-h-64 overflow-y-auto text-sm"></div>
-                </div>
-
-                <!-- DFS Traversal -->
-                <div class="glass rounded-xl shadow-sm border border-gray-200 p-6 feature-card">
-                    <div class="flex items-center gap-3 mb-6">
-                        <div class="w-10 h-10 bg-purple-100 text-purple-600 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-tree"></i>
-                        </div>
-                        <h2 class="text-lg font-bold">DFS Traversal</h2>
-                    </div>
-                    <p class="text-gray-600 text-sm mb-6">Iterative Depth-First Search using explicit stack.</p>
-                    <input type="text" id="dfs-input" placeholder="Enter node ID or name" class="w-full p-2 border border-gray-300 rounded-lg mb-3 text-sm">
-                    <button onclick="runDFS()" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-medium transition-colors">
-                        Run DFS
-                    </button>
-                    <div id="dfs-output" class="mt-4 hidden result-box p-4 bg-gray-100 rounded-lg max-h-64 overflow-y-auto text-sm"></div>
-                </div>
-
+                <p class="card-meta mb-4">View comprehensive graph metrics computed from the CSR representation.</p>
+                <button onclick="loadStats()" class="w-full bg-accent text-gray-900 py-2 rounded font-medium text-sm hover:bg-accent-secondary transition-colors" aria-pressed="false">
+                    Load Statistics
+                </button>
+                <div id="stats-output" class="mt-3 text-xs text-muted font-mono space-y-1"></div>
             </div>
 
-            <!-- Right Column -->
-            <div class="flex-1 flex flex-col gap-6">
-                
-                <!-- Shortest Path -->
-                <div class="glass rounded-xl shadow-sm border border-gray-200 p-6 feature-card">
-                    <div class="flex items-center gap-3 mb-6">
-                        <div class="w-10 h-10 bg-orange-100 text-orange-600 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-route"></i>
-                        </div>
-                        <h2 class="text-lg font-bold">Shortest Path (Bi-BFS)</h2>
+            <!-- BFS Traversal (1x2 vertical) -->
+            <div class="span-1x2 bento-card" aria-label="BFS Traversal: breadth-first search from any node">
+                <div class="flex items-center gap-2 mb-4">
+                    <div class="w-6 h-6 bg-success text-white rounded flex items-center justify-center text-xs font-bold">
+                        <i class="fas fa-sitemap"></i>
                     </div>
-                    <p class="text-gray-600 text-sm mb-6">Bidirectional BFS between two nodes.</p>
-                    <input type="text" id="sp-src" placeholder="Source node ID or name" class="w-full p-2 border border-gray-300 rounded-lg mb-2 text-sm">
-                    <input type="text" id="sp-dst" placeholder="Destination node ID or name" class="w-full p-2 border border-gray-300 rounded-lg mb-3 text-sm">
-                    <button onclick="runShortestPath()" class="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 rounded-lg font-medium transition-colors">
-                        Find Path
-                    </button>
-                    <div id="sp-output" class="mt-4 hidden result-box p-4 bg-gray-100 rounded-lg text-sm"></div>
+                    <h2 class="card-title text-base">BFS Traversal</h2>
                 </div>
+                <p class="card-meta mb-3">Breadth-First Search from any node (ID or name).</p>
+                <input type="text" id="bfs-input" placeholder="Node ID or name" class="w-full p-2 border border-border rounded text-sm mb-3 bg-surface" aria-label="BFS start node">
+                <button onclick="runBFS()" class="w-full bg-success text-white py-2 rounded font-medium text-sm hover:bg-success/90 transition-colors" aria-pressed="false">
+                    Run BFS
+                </button>
+                <div id="bfs-output" class="mt-3 text-xs text-muted max-h-32 overflow-y-auto font-mono"></div>
+            </div>
 
-                <!-- PageRank -->
-                <div class="glass rounded-xl shadow-sm border border-gray-200 p-6 feature-card">
-                    <div class="flex items-center gap-3 mb-6">
-                        <div class="w-10 h-10 bg-red-100 text-red-600 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-chart-line"></i>
-                        </div>
-                        <h2 class="text-lg font-bold">PageRank Analysis</h2>
+            <!-- DFS Traversal (1x2 vertical) -->
+            <div class="span-1x2 bento-card" aria-label="DFS Traversal: iterative depth-first search using explicit stack">
+                <div class="flex items-center gap-2 mb-4">
+                    <div class="w-6 h-6 bg-accent text-gray-900 rounded flex items-center justify-center text-xs font-bold">
+                        <i class="fas fa-tree"></i>
                     </div>
-                    <p class="text-gray-600 text-sm mb-6">Iterative PageRank centrality scores (top 10).</p>
-                    <button onclick="runPageRank()" class="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-medium transition-colors">
-                        Compute PageRank
-                    </button>
-                    <div id="pagerank-output" class="mt-4 hidden result-box p-4 bg-gray-100 rounded-lg max-h-64 overflow-y-auto text-sm"></div>
+                    <h2 class="card-title text-base">DFS Traversal</h2>
                 </div>
+                <p class="card-meta mb-3">Iterative Depth-First Search using explicit stack.</p>
+                <input type="text" id="dfs-input" placeholder="Node ID or name" class="w-full p-2 border border-border rounded text-sm mb-3 bg-surface" aria-label="DFS start node">
+                <button onclick="runDFS()" class="w-full bg-accent text-gray-900 py-2 rounded font-medium text-sm hover:bg-accent-secondary transition-colors" aria-pressed="false">
+                    Run DFS
+                </button>
+                <div id="dfs-output" class="mt-3 text-xs text-muted max-h-32 overflow-y-auto font-mono"></div>
+            </div>
 
-                <!-- Friend Suggestions -->
-                <div class="glass rounded-xl shadow-sm border border-gray-200 p-6 feature-card">
-                    <div class="flex items-center gap-3 mb-6">
-                        <div class="w-10 h-10 bg-teal-100 text-teal-600 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-users"></i>
-                        </div>
-                        <h2 class="text-lg font-bold">Friend Suggestions</h2>
+            <!-- Shortest Path (1x2 vertical) -->
+            <div class="span-1x2 bento-card" aria-label="Shortest Path: bidirectional BFS between two nodes">
+                <div class="flex items-center gap-2 mb-4">
+                    <div class="w-6 h-6 bg-warning text-white rounded flex items-center justify-center text-xs font-bold">
+                        <i class="fas fa-route"></i>
                     </div>
-                    <p class="text-gray-600 text-sm mb-6">2-hop "friend of a friend" recommendations.</p>
-                    <input type="text" id="sugg-input" placeholder="Enter node ID or name" class="w-full p-2 border border-gray-300 rounded-lg mb-3 text-sm">
-                    <button onclick="runSuggestions()" class="w-full bg-teal-600 hover:bg-teal-700 text-white py-3 rounded-lg font-medium transition-colors">
-                        Get Suggestions
-                    </button>
-                    <div id="sugg-output" class="mt-4 hidden result-box p-4 bg-gray-100 rounded-lg max-h-64 overflow-y-auto text-sm"></div>
+                    <h2 class="card-title text-base">Shortest Path</h2>
                 </div>
-
+                <p class="card-meta mb-3">Bidirectional BFS between two nodes.</p>
+                <input type="text" id="sp-src" placeholder="Source" class="w-full p-2 border border-border rounded text-sm mb-2 bg-surface" aria-label="Shortest path source">
+                <input type="text" id="sp-dst" placeholder="Destination" class="w-full p-2 border border-border rounded text-sm mb-3 bg-surface" aria-label="Shortest path destination">
+                <button onclick="runShortestPath()" class="w-full bg-warning text-white py-2 rounded font-medium text-sm hover:bg-warning/90 transition-colors" aria-pressed="false">
+                    Find Path
+                </button>
+                <div id="sp-output" class="mt-3 text-xs text-muted max-h-32 overflow-y-auto font-mono"></div>
             </div>
 
         </div>
 
-        <!-- Bottom Row: Additional Features -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
-            <div class="glass rounded-xl shadow-sm border border-gray-200 p-6 feature-card">
-                <div class="flex items-center gap-3 mb-6">
-                    <div class="w-10 h-10 bg-cyan-100 text-cyan-600 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-search"></i>
-                    </div>
-                    <h2 class="text-lg font-bold">Search by Name</h2>
-                </div>
-                <input type="text" id="search-input" placeholder="Type name to search" class="w-full p-2 border border-gray-300 rounded-lg mb-3 text-sm">
-                <button onclick="searchName()" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white py-3 rounded-lg font-medium transition-colors">
-                    Search
-                </button>
-                <div id="search-output" class="mt-4 hidden result-box p-4 bg-gray-100 rounded-lg max-h-64 overflow-y-auto text-sm"></div>
-            </div>
-
-            <div class="glass rounded-xl shadow-sm border border-gray-200 p-6 feature-card">
-                <div class="flex items-center gap-3 mb-6">
-                    <div class="w-10 h-10 bg-pink-100 text-pink-600 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-layer-group"></i>
-                    </div>
-                    <h2 class="text-lg font-bold">Connected Components</h2>
-                </div>
-                <p class="text-gray-600 text-sm mb-4">Union-Find component analysis.</p>
-                <button onclick="runComponents()" class="w-full bg-pink-600 hover:bg-pink-700 text-white py-3 rounded-lg font-medium transition-colors">
-                    Analyze Components
-                </button>
-                <div id="components-output" class="mt-4 hidden result-box p-4 bg-gray-100 rounded-lg max-h-64 overflow-y-auto text-sm"></div>
-            </div>
-
-            <div class="glass rounded-xl shadow-sm border border-gray-200 p-6 feature-card">
-                <div class="flex items-center gap-3 mb-6">
-                    <div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center">
-                        <i class="fas fa-layer-group"></i>
-                    </div>
-                    <h2 class="text-lg font-bold">Top Degree Nodes</h2>
-                </div>
-                <input type="number" id="topk-input" placeholder="K (default 10)" value="10" class="w-full p-2 border border-gray-300 rounded-lg mb-3 text-sm">
-                <button onclick="runTopDegree()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition-colors">
-                    Get Top Nodes
-                </button>
-                <div id="topk-output" class="mt-4 hidden result-box p-4 bg-gray-100 rounded-lg max-h-64 overflow-y-auto text-sm"></div>
-            </div>
-        </div>
-
-        <!-- Network Visualization Section (Full Width) -->
-        <div class="glass rounded-xl shadow-sm border border-gray-200 p-6 mt-8 feature-card">
-            <div class="flex items-center gap-3 mb-6">
-                <div class="w-10 h-10 bg-indigo-500 text-white rounded-lg flex items-center justify-center">
+        <!-- Hero: Network Visualization (2x2 hero, primary proof point) -->
+        <div class="span-2x2 bento-card primary" aria-label="Network Visualization: visible connections between people as nodes and edges">
+            <div class="flex items-center gap-2 mb-4">
+                <div class="w-6 h-6 bg-accent text-gray-900 rounded flex items-center justify-center text-xs font-bold">
                     <i class="fas fa-project-diagram"></i>
                 </div>
-                <div>
-                    <h2 class="text-lg font-bold">Network Visualization</h2>
-                    <p class="text-gray-500 text-sm">Visible connections between people (nodes & edges)</p>
-                </div>
+                <h2 class="card-title text-base">Network Visualization</h2>
             </div>
+            <p class="card-meta mb-3">Visible connections between people (nodes &amp; edges). Interactive graph with physics layout.</p>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                 <div>
-                    <label class="block text-xs font-medium text-gray-700 mb-1">Center Node (ID or Name)</label>
-                    <input type="text" id="viz-node" placeholder="e.g. 0 or Divya Choudhary" class="w-full p-2 border border-gray-300 rounded-lg text-sm" value="0">
+                    <label class="block text-xs font-semibold text-muted mb-1">Center Node</label>
+                    <input type="text" id="viz-node" placeholder="ID or name" value="0" class="w-full p-2 border border-border rounded text-sm bg-surface" aria-label="Network center node">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-gray-700 mb-1">Depth (hops)</label>
-                    <select id="viz-depth" class="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white">
-                        <option value="1">1 hop (direct friends)</option>
-                        <option value="2">2 hops (friends of friends)</option>
+                    <label class="block text-xs font-semibold text-muted mb-1">Depth</label>
+                    <select id="viz-depth" class="w-full p-2 border border-border rounded text-sm bg-surface" aria-label="Traversal depth">
+                        <option value="1">1 hop</option>
+                        <option value="2" selected>2 hops</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-gray-700 mb-1">Max Nodes</label>
-                    <input type="number" id="viz-limit" value="150" min="10" max="500" class="w-full p-2 border border-gray-300 rounded-lg text-sm bg-white">
+                    <label class="block text-xs font-semibold text-muted mb-1">Max Nodes</label>
+                    <input type="number" id="viz-limit" value="150" min="10" max="500" class="w-full p-2 border border-border rounded text-sm bg-surface" aria-label="Maximum nodes to display">
                 </div>
             </div>
 
-            <div class="flex gap-3 mb-6">
-                <button onclick="runVisualize()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2">
-                    <i class="fas fa-play"></i> Load Network
+            <div class="flex gap-3 mb-3">
+                <button onclick="runVisualize()" class="flex-1 bg-accent text-gray-900 py-2 rounded font-medium text-sm flex items-center justify-center gap-2 hover:bg-accent-secondary transition-colors" aria-pressed="false">
+                    <i class="fas fa-play text-xs"></i> Load Network
                 </button>
-                <button onclick="clearNetwork()" class="px-6 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 rounded-lg font-medium transition-colors">
+                <button onclick="clearNetwork()" class="px-4 bg-border text-text py-2 rounded font-medium text-sm hover:bg-accent/20 transition-colors" aria-pressed="false">
                     Clear
                 </button>
             </div>
 
-            <div id="viz-container" class="w-full h-[600px] border-2 border-gray-200 rounded-lg bg-gray-50 relative overflow-hidden">
-                <div id="viz-msg" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
-                    <i class="fas fa-network-wired text-4xl mb-3 opacity-50"></i>
-                    <p class="text-lg">Enter a node and click <b>Load Network</b> to see visible connections</p>
+            <div id="viz-container" class="w-full h-[500px] border border-border rounded-lg bg-surface/50 relative overflow-hidden mb-3">
+                <div id="viz-msg" class="absolute inset-0 flex flex-col items-center justify-center text-muted">
+                    <i class="fas fa-network-wired text-3xl mb-2 opacity-30"></i>
+                    <p class="text-sm">Enter a node and click <b>Load Network</b> to see visible connections</p>
                 </div>
             </div>
-            <div id="viz-info" class="mt-3 text-sm text-gray-600 hidden">
-                <span class="font-bold" id="viz-count"></span> nodes • <span class="font-bold" id="viz-edge-count"></span> connections
-            </div>
 
-            <!-- Written Output: Nodes List -->
-            <div id="viz-nodes-output" class="mt-6 hidden result-box p-4 bg-gray-100 rounded-lg max-h-96 overflow-y-auto">
-                <h3 class="text-sm font-bold text-indigo-700 mb-2 flex items-center gap-2">
-                    <i class="fas fa-users"></i> Nodes in Network
-                </h3>
-                <div id="viz-nodes-list" class="text-xs grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1"></div>
-            </div>
-
-            <!-- Written Output: Edges/Connections List -->
-            <div id="viz-edges-output" class="mt-4 hidden result-box p-4 bg-gray-100 rounded-lg max-h-96 overflow-y-auto">
-                <h3 class="text-sm font-bold text-indigo-700 mb-2 flex items-center gap-2">
-                    <i class="fas fa-project-diagram"></i> Connections (Edges)
-                </h3>
-                <div id="viz-edges-list" class="text-xs grid grid-cols-1 sm:grid-cols-2 gap-1"></div>
+            <div class="flex items-center justify-between text-xs text-muted">
+                <span id="viz-count">0</span> nodes • <span id="viz-edge-count">0</span> connections
             </div>
         </div>
 
-        <!-- Chart Section -->
-        <div class="glass rounded-xl shadow-sm border border-gray-200 p-6 mt-8">
-            <h2 class="text-lg font-bold mb-4">Degree Distribution</h2>
-            <div class="h-64">
+        <!-- Written Output: Nodes (1x2 vertical) -->
+        <div class="span-1x2 bento-card" aria-label="Nodes in Network: list of all nodes with ID, name, and degree">
+            <div class="flex items-center gap-2 mb-3">
+                <div class="w-6 h-6 bg-accent-secondary text-white rounded flex items-center justify-center text-xs font-bold">
+                    <i class="fas fa-users"></i>
+                </div>
+                <h2 class="card-title text-base">Nodes</h2>
+            </div>
+            <div id="viz-nodes-output" class="hidden result-box">
+                <div class="card-title text-xs font-bold mb-2 flex items-center gap-1 text-accent-secondary">
+                    <i class="fas fa-list"></i> Nodes in Network
+                </div>
+                <div id="viz-nodes-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1"></div>
+            </div>
+        </div>
+
+        <!-- Written Output: Edges (1x2 vertical) -->
+        <div class="span-1x2 bento-card" aria-label="Connections: list of all edges between people in the subgraph">
+            <div class="flex items-center gap-2 mb-3">
+                <div class="w-6 h-6 bg-accent-secondary text-white rounded flex items-center justify-center text-xs font-bold">
+                    <i class="fas fa-project-diagram"></i>
+                </div>
+                <h2 class="card-title text-base">Connections</h2>
+            </div>
+            <div id="viz-edges-output" class="hidden result-box">
+                <div class="card-title text-xs font-bold mb-2 flex items-center gap-1 text-accent-secondary">
+                    <i class="fas fa-list-ul"></i> Connections (Edges)
+                </div>
+                <div id="viz-edges-list" class="grid grid-cols-1 sm:grid-cols-2 gap-1"></div>
+            </div>
+        </div>
+
+        <!-- PageRank (1x2 vertical) -->
+        <div class="span-1x2 bento-card" aria-label="PageRank Analysis: top 10 ranked nodes by centrality score">
+            <div class="flex items-center gap-2 mb-3">
+                <div class="w-6 h-6 bg-accent text-gray-900 rounded flex items-center justify-center text-xs font-bold">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <h2 class="card-title text-base">PageRank</h2>
+            </div>
+            <p class="card-meta mb-3">Top 10 nodes by PageRank centrality (damping 0.85, 20 iterations).</p>
+            <button onclick="runPageRank()" class="w-full bg-accent text-gray-900 py-2 rounded font-medium text-sm hover:bg-accent-secondary transition-colors" aria-pressed="false">
+                Compute PageRank
+            </button>
+            <div id="pagerank-output" class="mt-3 text-xs text-muted max-h-40 overflow-y-auto font-mono"></div>
+        </div>
+
+        <!-- Friend Suggestions (1x2 vertical) -->
+        <div class="span-1x2 bento-card" aria-label="Friend Suggestions: 2-hop recommendations with mutual friend count">
+            <div class="flex items-center gap-2 mb-3">
+                <div class="w-6 h-6 bg-success text-white rounded flex items-center justify-center text-xs font-bold">
+                    <i class="fas fa-users"></i>
+                </div>
+                <h2 class="card-title text-base">Friend Suggestions</h2>
+            </div>
+            <p class="card-meta mb-3">2-hop "friend of a friend" recommendations.</p>
+            <input type="text" id="sugg-input" placeholder="Node ID or name" class="w-full p-2 border border-border rounded text-sm mb-3 bg-surface" aria-label="Friend suggestion node">
+            <button onclick="runSuggestions()" class="w-full bg-success text-white py-2 rounded font-medium text-sm hover:bg-success/90 transition-colors" aria-pressed="false">
+                Get Suggestions
+            </button>
+            <div id="sugg-output" class="mt-3 text-xs text-muted max-h-40 overflow-y-auto font-mono"></div>
+        </div>
+
+        <!-- Chart: Degree Distribution (2x1 hero chart) -->
+        <div class="span-2x1 bento-card" aria-label="Degree Distribution: bar chart of node degrees across the network">
+            <div class="flex items-center gap-2 mb-3">
+                <div class="w-6 h-6 bg-accent-secondary text-white rounded flex items-center justify-center text-xs font-bold">
+                    <i class="fas fa-chart-bar"></i>
+                </div>
+                <h2 class="card-title text-base">Degree Distribution</h2>
+            </div>
+            <div class="chart-wrap">
                 <canvas id="degreeChart"></canvas>
             </div>
         </div>
-    </div>
+
+        <!-- Connected Components (1x2 vertical) -->
+        <div class="span-1x2 bento-card" aria-label="Connected Components: Union-Find component analysis">
+            <div class="flex items-center gap-2 mb-3">
+                <div class="w-6 h-6 bg-accent text-gray-900 rounded flex items-center justify-center text-xs font-bold">
+                    <i class="fas fa-layer-group"></i>
+                </div>
+                <h2 class="card-title text-base">Components</h2>
+            </div>
+            <p class="card-meta mb-3">Union-Find component analysis.</p>
+            <button onclick="runComponents()" class="w-full bg-accent text-gray-900 py-2 rounded font-medium text-sm hover:bg-accent-secondary transition-colors" aria-pressed="false">
+                Analyze Components
+            </button>
+            <div id="components-output" class="mt-3 text-xs text-muted max-h-40 overflow-y-auto font-mono"></div>
+        </div>
+
+        <!-- Top Degree Nodes (1x2 vertical) -->
+        <div class="span-1x2 bento-card" aria-label="Top Degree Nodes: highest degree centrality ranking">
+            <div class="flex items-center gap-2 mb-3">
+                <div class="w-6 h-6 bg-accent text-gray-900 rounded flex items-center justify-center text-xs font-bold">
+                    <i class="fas fa-sort-amount-down"></i>
+                </div>
+                <h2 class="card-title text-base">Top Degree</h2>
+            </div>
+            <input type="number" id="topk-input" value="10" min="1" max="500" class="w-full p-2 border border-border rounded text-sm mb-3 bg-surface" aria-label="Number of top nodes">
+            <button onclick="runTopDegree()" class="w-full bg-accent text-gray-900 py-2 rounded font-medium text-sm hover:bg-accent-secondary transition-colors" aria-pressed="false">
+                Get Top Nodes
+            </button>
+            <div id="topk-output" class="mt-3 text-xs text-muted max-h-40 overflow-y-auto font-mono"></div>
+        </div>
+
+        <!-- Search by Name (1x2 vertical) -->
+        <div class="span-1x2 bento-card" aria-label="Search by Name: partial case-insensitive name search">
+            <div class="flex items-center gap-2 mb-3">
+                <div class="w-6 h-6 bg-accent-secondary text-white rounded flex items-center justify-center text-xs font-bold">
+                    <i class="fas fa-search"></i>
+                </div>
+                <h2 class="card-title text-base">Search by Name</h2>
+            </div>
+            <input type="text" id="search-input" placeholder="Type name to search" class="w-full p-2 border border-border rounded text-sm mb-3 bg-surface" aria-label="Name search query">
+            <button onclick="searchName()" class="w-full bg-accent-secondary text-white py-2 rounded font-medium text-sm hover:bg-accent-secondary/90 transition-colors" aria-pressed="false">
+                Search
+            </button>
+            <div id="search-output" class="mt-3 text-xs text-muted max-h-40 overflow-y-auto font-mono"></div>
+        </div>
+
+    </main>
 
     <script>
-        // Global Chart instance
-        let degreeChart = null;
-
+        // === API Helpers ===
         async function fetchAPI(endpoint, method = 'GET', body = null) {
             const opts = { method, headers: { 'Content-Type': 'application/json' } };
             if (body) opts.body = JSON.stringify(body);
@@ -313,189 +432,180 @@
             return res.json();
         }
 
+        // === Stats ===
         async function loadStats() {
             const data = await fetchAPI('stats');
             document.getElementById('stats-output').innerHTML = `
-                <div class="grid grid-cols-2 gap-2">
-                    <div><span class="font-bold">Total Nodes:</span> ${data.total_nodes}</div>
-                    <div><span class="font-bold">Total Edges:</span> ${data.total_edges}</div>
-                    <div><span class="font-bold">Avg Degree:</span> ${data.avg_degree}</div>
-                    <div><span class="font-bold">Max Degree:</span> ${data.max_degree}</div>
-                    <div><span class="font-bold">Min Degree:</span> ${data.min_degree}</div>
-                    <div><span class="font-bold">Density:</span> ${data.density}</div>
+                <div class="grid grid-cols-2 gap-1">
+                    <div><span class="font-bold text-text">Total Nodes:</span> <span class="text-accent">${data.total_nodes}</span></div>
+                    <div><span class="font-bold text-text">Total Edges:</span> <span class="text-accent-secondary">${data.total_edges}</span></div>
+                    <div><span class="font-bold text-text">Avg Degree:</span> <span class="text-success">${data.avg_degree}</span></div>
+                    <div><span class="font-bold text-text">Max Degree:</span> <span class="text-warning">${data.max_degree}</span></div>
+                    <div><span class="font-bold text-text">Min Degree:</span> <span class="text-muted">${data.min_degree}</span></div>
+                    <div><span class="font-bold text-text">Density:</span> <span class="text-text">${data.density}</span></div>
                 </div>
             `;
-            document.getElementById('stats-output').classList.remove('hidden');
         }
 
+        // === BFS ===
         async function runBFS() {
             const input = document.getElementById('bfs-input').value;
             const data = await fetchAPI('bfs', 'POST', { start: input });
-            if (data.error) {
-                alert(data.error);
-                return;
-            }
-            let html = `<p class="mb-2 text-gray-600">Visited ${data.total_visited} nodes:</p><div class="flex flex-wrap gap-2">`;
-            data.traversal.forEach(n => {
-                html += `<span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-xs">${n.name} (${n.id})</span>`;
-            });
-            html += `</div>`;
-            document.getElementById('bfs-output').innerHTML = html;
-            document.getElementById('bfs-output').classList.remove('hidden');
+            if (data.error) { alert(data.error); return; }
+            document.getElementById('bfs-output').innerHTML = `
+                <p class="mb-1 text-xs font-bold text-accent-secondary">Visited ${data.total_visited} nodes:</p>
+                <div class="flex flex-wrap gap-1">
+                    ${data.traversal.map(n => `<span class="px-2 py-1 rounded bg-surface/50 border border-border text-xs">${n.name} (${n.id})</span>`).join('')}
+                </div>
+            `;
         }
 
+        // === DFS ===
         async function runDFS() {
             const input = document.getElementById('dfs-input').value;
             const data = await fetchAPI('dfs', 'POST', { start: input });
-            if (data.error) {
-                alert(data.error);
-                return;
-            }
-            let html = `<p class="mb-2 text-gray-600">Visited ${data.total_visited} nodes:</p><div class="flex flex-wrap gap-2">`;
-            data.traversal.forEach(n => {
-                html += `<span class="bg-purple-100 text-purple-700 px-2 py-1 rounded text-xs">${n.name} (${n.id})</span>`;
-            });
-            html += `</div>`;
-            document.getElementById('dfs-output').innerHTML = html;
-            document.getElementById('dfs-output').classList.remove('hidden');
+            if (data.error) { alert(data.error); return; }
+            document.getElementById('dfs-output').innerHTML = `
+                <p class="mb-1 text-xs font-bold text-accent-secondary">Visited ${data.total_visited} nodes:</p>
+                <div class="flex flex-wrap gap-1">
+                    ${data.traversal.map(n => `<span class="px-2 py-1 rounded bg-surface/50 border border-border text-xs">${n.name} (${n.id})</span>`).join('')}
+                </div>
+            `;
         }
 
+        // === Shortest Path ===
         async function runShortestPath() {
             const src = document.getElementById('sp-src').value;
             const dst = document.getElementById('sp-dst').value;
             const data = await fetchAPI('shortest_path', 'POST', { src, dst });
-            if (data.error) {
-                alert(data.error);
-                return;
-            }
+            if (data.error) { alert(data.error); return; }
             if (data.distance === -1) {
-                document.getElementById('sp-output').innerHTML = `<p class="text-red-600">${data.message}</p>`;
+                document.getElementById('sp-output').innerHTML = `<p class="text-warning">${data.message}</p>`;
             } else {
-                let html = `<p class="mb-2 text-gray-600">Distance: ${data.distance} hops</p><div class="flex flex-col gap-2">`;
+                let html = `<p class="mb-1 text-xs font-bold text-accent-secondary">Distance: ${data.distance} hops</p>
+                    <div class="flex flex-col gap-1">`;
                 data.path.forEach((n, i) => {
-                    html += `<div class="flex items-center gap-2"><span class="text-xs font-bold text-gray-500">${i+1}</span><span class="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs">${n.name} (${n.id})</span>${i < data.path.length - 1 ? '<i class="fas fa-arrow-right text-gray-400"></i>' : ''}</div>`;
+                    html += `<div class="flex items-center gap-1">
+                        <span class="text-[10px] font-bold text-muted">${i+1}</span>
+                        <span class="px-1.5 py-0.5 rounded bg-surface/50 border border-border text-xs">${n.name} (${n.id})</span>
+                        ${i < data.path.length - 1 ? '<span class="text-xs text-muted">↓</span>' : ''}
+                    </div>`;
                 });
                 html += `</div>`;
                 document.getElementById('sp-output').innerHTML = html;
             }
-            document.getElementById('sp-output').classList.remove('hidden');
         }
 
+        // === PageRank ===
         async function runPageRank() {
             const data = await fetchAPI('pagerank');
-            let html = `<table class="w-full text-left text-xs"><thead><tr class="border-b"><th class="pb-1">Rank</th><th class="pb-1">Node</th><th class="pb-1">Score</th></tr></thead><tbody>`;
+            let html = `<table class="w-full text-left text-xs"><thead><tr class="border-b border-border"><th class="pb-1 text-muted">Rank</th><th class="pb-1 text-muted">Node</th><th class="pb-1 text-muted font-mono">Score</th></tr></thead><tbody>`;
             data.top.forEach((n, i) => {
-                html += `<tr class="border-b"><td class="py-1">${i+1}</td><td class="py-1">${n.name} (${n.id})</td><td class="py-1 font-mono">${n.score}</td></tr>`;
+                html += `<tr class="border-b border-border"><td class="py-1">${i+1}</td><td class="py-1">${n.name} (${n.id})</td><td class="py-1 font-mono text-success">${n.score}</td></tr>`;
             });
             html += `</tbody></table>`;
             document.getElementById('pagerank-output').innerHTML = html;
-            document.getElementById('pagerank-output').classList.remove('hidden');
         }
 
+        // === Suggestions ===
         async function runSuggestions() {
             const input = document.getElementById('sugg-input').value;
             const data = await fetchAPI('suggestions', 'POST', { node: input });
-            if (data.error) {
-                alert(data.error);
-                return;
-            }
+            if (data.error) { alert(data.error); return; }
             if (data.suggestions.length === 0) {
-                document.getElementById('sugg-output').innerHTML = `<p class="text-gray-600">No suggestions found.</p>`;
+                document.getElementById('sugg-output').innerHTML = `<p class="text-muted">No suggestions found.</p>`;
             } else {
-                let html = `<table class="w-full text-left text-xs"><thead><tr class="border-b"><th class="pb-1">#</th><th class="pb-1">Suggested Friend</th><th class="pb-1">Mutual Friends</th></tr></thead><tbody>`;
+                let html = `<table class="w-full text-left text-xs"><thead><tr class="border-b border-border"><th class="pb-1 text-muted">#</th><th class="pb-1 text-muted">Suggested Friend</th><th class="pb-1 text-muted font-mono">Mutual</th></tr></thead><tbody>`;
                 data.suggestions.forEach((n, i) => {
-                    html += `<tr class="border-b"><td class="py-1">${i+1}</td><td class="py-1">${n.name} (${n.id})</td><td class="py-1 font-mono">${n.mutual}</td></tr>`;
+                    html += `<tr class="border-b border-border"><td class="py-1">${i+1}</td><td class="py-1">${n.name} (${n.id})</td><td class="py-1 font-mono text-success">${n.mutual}</td></tr>`;
                 });
                 html += `</tbody></table>`;
                 document.getElementById('sugg-output').innerHTML = html;
             }
-            document.getElementById('sugg-output').classList.remove('hidden');
         }
 
+        // === Search Name ===
         async function searchName() {
             const query = document.getElementById('search-input').value;
             const data = await fetchAPI('search_name', 'POST', { query });
             if (data.results.length === 0) {
-                document.getElementById('search-output').innerHTML = `<p class="text-gray-600">No matches found.</p>`;
+                document.getElementById('search-output').innerHTML = `<p class="text-muted">No matches found.</p>`;
             } else {
-                let html = `<table class="w-full text-left text-xs"><thead><tr class="border-b"><th class="pb-1">ID</th><th class="pb-1">Name</th><th class="pb-1">Degree</th></tr></thead><tbody>`;
+                let html = `<table class="w-full text-left text-xs"><thead><tr class="border-b border-border"><th class="pb-1 text-muted">ID</th><th class="pb-1 text-muted">Name</th><th class="pb-1 text-muted font-mono">Degree</th></tr></thead><tbody>`;
                 data.results.forEach(n => {
-                    html += `<tr class="border-b"><td class="py-1">${n.id}</td><td class="py-1">${n.name}</td><td class="py-1 font-mono">${n.degree}</td></tr>`;
+                    html += `<tr class="border-b border-border"><td class="py-1">${n.id}</td><td class="py-1">${n.name}</td><td class="py-1 font-mono text-success">${n.degree}</td></tr>`;
                 });
                 html += `</tbody></table>`;
                 document.getElementById('search-output').innerHTML = html;
             }
-            document.getElementById('search-output').classList.remove('hidden');
         }
 
+        // === Components ===
         async function runComponents() {
             const data = await fetchAPI('components');
-            let html = `<p class="mb-2 text-gray-600">Total Components: <span class="font-bold">${data.count}</span></p><p class="mb-2 text-gray-600">Largest Component Size: <span class="font-bold">${data.largest_size}</span></p>`;
-            html += `<table class="w-full text-left text-xs"><thead><tr class="border-b"><th class="pb-1">Component</th><th class="pb-1">Sample Nodes</th></tr></thead><tbody>`;
+            let html = `<p class="mb-1 text-xs font-bold text-accent-secondary">Total Components: <span class="font-bold text-text">${data.count}</span></p>
+                <p class="mb-2 text-xs font-bold text-accent-secondary">Largest Component Size: <span class="font-bold text-text">${data.largest_size}</span></p>
+                <table class="w-full text-left text-xs"><thead><tr class="border-b border-border"><th class="pb-1 text-muted">Component</th><th class="pb-1 text-muted">Sample Nodes</th></tr></thead><tbody>`;
             data.components.forEach((comp, i) => {
-                html += `<tr class="border-b"><td class="py-1 font-bold">#${i+1}</td><td class="py-1">${comp.map(n => n.name + '(' + n.id + ')').join(', ')}</td></tr>`;
+                html += `<tr class="border-b border-border"><td class="py-1 font-bold text-text">#${i+1}</td><td class="py-1">${comp.map(n => n.name + ' (' + n.id + ')').join(', ')}</td></tr>`;
             });
             html += `</tbody></table>`;
             document.getElementById('components-output').innerHTML = html;
-            document.getElementById('components-output').classList.remove('hidden');
         }
 
+        // === Top Degree ===
         async function runTopDegree() {
             const k = document.getElementById('topk-input').value || 10;
             const data = await fetchAPI('top_degree', 'POST', { k });
-            let html = `<table class="w-full text-left text-xs"><thead><tr class="border-b"><th class="pb-1">Rank</th><th class="pb-1">Node</th><th class="pb-1">Degree</th></tr></thead><tbody>`;
+            let html = `<table class="w-full text-left text-xs"><thead><tr class="border-b border-border"><th class="pb-1 text-muted">Rank</th><th class="pb-1 text-muted">Node</th><th class="pb-1 text-muted font-mono">Degree</th></tr></thead><tbody>`;
             data.top.forEach((n, i) => {
-                html += `<tr class="border-b"><td class="py-1">${i+1}</td><td class="py-1">${n.name} (${n.id})</td><td class="py-1 font-mono">${n.degree}</td></tr>`;
+                html += `<tr class="border-b border-border"><td class="py-1">${i+1}</td><td class="py-1">${n.name} (${n.id})</td><td class="py-1 font-mono text-success">${n.degree}</td></tr>`;
             });
             html += `</tbody></table>`;
             document.getElementById('topk-output').innerHTML = html;
-            document.getElementById('topk-output').classList.remove('hidden');
         }
 
-        // Initialize degree chart
-        fetch('/api/stats').then(r => r.json()).then(data => {
-            // We need actual degree distribution; fetch from backend
-            fetch('/api/top_degree', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({k: 50}) })
-                .then(r => r.json())
-                .then(data => {
-                    const ctx = document.getElementById('degreeChart').getContext('2d');
-                    const labels = data.top.map(n => n.name + ' (' + n.id + ')');
-                    const values = data.top.map(n => n.degree);
-                    degreeChart = new Chart(ctx, {
-                        type: 'bar',
-                        data: {
-                            labels: labels,
-                            datasets: [{
-                                label: 'Degree',
-                                data: values,
-                                backgroundColor: 'rgba(99, 102, 241, 0.7)',
-                                borderColor: 'rgb(99, 102, 241)',
-                                borderWidth: 1
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            scales: { y: { beginAtZero: true } },
-                            plugins: { legend: { display: false } }
-                        }
-                    });
+        // === Degree Chart ===
+        fetch('/api/top_degree', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ k: 30 })
+        })
+            .then(r => r.json())
+            .then(data => {
+                const ctx = document.getElementById('degreeChart').getContext('2d');
+                const labels = data.top.map(n => n.name + ' (' + n.id + ')');
+                const values = data.top.map(n => n.degree);
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Degree',
+                            data: values,
+                            backgroundColor: 'rgba(250, 212, 192, 0.7)',
+                            borderColor: '#FAD4C0',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: { y: { beginAtZero: true, ticks: { color: '#A1A1AA', font: { size: 10 } } }, x: { ticks: { color: '#A1A1AA', font: { size: 10 } } } },
+                        plugins: { legend: { display: false } }
+                    }
                 });
-        });
+            });
 
-        // === Network Visualization (vis-network) ===
+        // === Network Visualization ===
         let network = null;
+        let dataNodesCache = [];
 
-        // Helper: convert node ID to name
         function getNameFromId(id) {
-            // Try to extract from label if it contains name
-            // Fallback: just show ID if no name mapping available
             const node = dataNodesCache.find(n => n.id === id);
             if (node) return node.label.split('\n')[0];
             return `Node ${id}`;
         }
-
-        // Cache for node data
-        let dataNodesCache = [];
 
         async function runVisualize() {
             const nodeInput = document.getElementById('viz-node').value.trim();
@@ -504,22 +614,18 @@
 
             const container = document.getElementById('viz-container');
             const msg = document.getElementById('viz-msg');
-            const info = document.getElementById('viz-info');
 
-            // Destroy existing network
             if (network) {
                 network.destroy();
                 network = null;
             }
 
-            // Show loading
             msg.innerHTML = `
-                <div class="flex flex-col items-center justify-center text-gray-600">
-                    <i class="fas fa-circle-notch fa-spin text-3xl mb-3"></i>
-                    <p class="text-lg">Loading network connections...</p>
+                <div class="flex flex-col items-center justify-center text-muted">
+                    <i class="fas fa-circle-notch fa-spin text-3xl mb-2"></i>
+                    <p class="text-sm">Loading network connections...</p>
                 </div>
             `;
-            info.classList.add('hidden');
 
             try {
                 const data = await fetchAPI('visualize', 'POST', {
@@ -529,7 +635,7 @@
                 });
 
                 if (data.error) {
-                    msg.innerHTML = `<p class="text-red-500 text-lg">Error: ${data.error}</p>`;
+                    msg.innerHTML = `<p class="text-warning text-lg">Error: ${data.error}</p>`;
                     return;
                 }
 
@@ -541,109 +647,81 @@
                     title: n.title,
                     size: n.size,
                     color: n.color,
-                    font: { size: 12, color: '#333' }
+                    font: { size: 12, color: '#333', strokeWidth: 2, strokeColor: '#fff' }
                 })));
 
                 const edges = new vis.DataSet(data.edges);
 
-                const domContainer = document.getElementById('viz-container');
-                domContainer.innerHTML = ''; // clear msg
+                container.innerHTML = '';
                 const canvas = document.createElement('div');
                 canvas.id = 'viz-network';
                 canvas.style.width = '100%';
-                canvas.style.height = '600px';
-                domContainer.appendChild(canvas);
+                canvas.style.height = '500px';
+                container.appendChild(canvas);
 
                 const options = {
-                    nodes: {
-                        shape: 'dot',
-                        borderWidth: 2,
-                        shadow: true,
-                        font: { size: 12, color: '#333', strokeWidth: 2, strokeColor: '#fff' }
-                    },
-                    edges: {
-                        width: 1.5,
-                        color: { inherit: false, color: '#cbd5e1' },
-                        smooth: { type: 'continuous' },
-                        shadow: false
-                    },
+                    nodes: { shape: 'dot', borderWidth: 2, shadow: true, font: { size: 12, color: '#333', strokeWidth: 2, strokeColor: '#fff' } },
+                    edges: { width: 1.5, color: { inherit: false, color: '#78716C' }, smooth: { type: 'continuous' }, shadow: false },
                     physics: {
                         enabled: true,
                         solver: 'forceAtlas2Based',
-                        forceAtlas2Based: {
-                            gravitationalConstant: -50,
-                            centralGravity: 0.01,
-                            springLength: 100,
-                            springConstant: 0.08,
-                            avoidOverlap: 0.1
-                        },
+                        forceAtlas2Based: { gravitationalConstant: -50, centralGravity: 0.01, springLength: 100, springConstant: 0.08, avoidOverlap: 0.1 },
                         stabilization: { iterations: 100 }
                     },
-                    interaction: {
-                        hover: true,
-                        tooltipDelay: 100,
-                        navigationButtons: true,
-                        keyboard: true
-                    },
-                    layout: {
-                        randomSeed: 42
-                    }
+                    interaction: { hover: true, tooltipDelay: 100, navigationButtons: true, keyboard: true },
+                    layout: { randomSeed: 42 }
                 };
 
                 network = new vis.Network(document.getElementById('viz-network'), { nodes, edges }, options);
 
                 msg.style.display = 'none';
-                info.classList.remove('hidden');
                 document.getElementById('viz-count').textContent = data.nodes.length;
                 document.getElementById('viz-edge-count').textContent = data.edges.length;
 
-                // === Written Output: Nodes List ===
+                // Written output: Nodes
                 const nodesList = document.getElementById('viz-nodes-list');
                 nodesList.innerHTML = data.nodes.map(n => {
                     const isRoot = n.color === '#ef4444';
                     return `
-                        <div class="p-2 rounded bg-white border border-gray-200 ${isRoot ? 'border-red-300 bg-red-50' : ''} text-sm">
-                            <div class="font-bold text-gray-800 ${isRoot ? 'text-red-700' : ''}">${getNameFromId(n.id)}</div>
-                            <div class="text-xs text-gray-500">ID: ${n.id} • Degree: ${Math.round(n.size - 10)}</div>
+                        <div class="p-2 rounded border ${isRoot ? 'border-red-500 bg-red-500/10' : 'border-border bg-surface'} text-sm">
+                            <div class="font-bold text-text ${isRoot ? 'text-warning' : ''}">${getNameFromId(n.id)}</div>
+                            <div class="text-[10px] text-muted">ID: ${n.id} • Deg: ${Math.round(n.size - 10)}</div>
                         </div>
                     `;
                 }).join('');
                 document.getElementById('viz-nodes-output').classList.remove('hidden');
 
-                // === Written Output: Edges List ===
+                // Written output: Edges
                 const edgesList = document.getElementById('viz-edges-list');
                 edgesList.innerHTML = data.edges.map(e => `
-                    <div class="p-2 rounded bg-white border border-gray-200 text-sm border-b">
+                    <div class="p-2 rounded border border-border bg-surface text-sm border-b">
                         <div class="flex items-center justify-between">
-                            <span class="font-medium text-gray-700">${getNameFromId(e.from)} (${e.from})</span>
-                            <span class="text-xs text-indigo-600 font-bold">↔</span>
-                            <span class="font-medium text-gray-700">${getNameFromId(e.to)} (${e.to})</span>
+                            <span class="font-medium text-text">${getNameFromId(e.from)} (${e.from})</span>
+                            <span class="text-[10px] text-accent-secondary font-bold">↔</span>
+                            <span class="font-medium text-text">${getNameFromId(e.to)} (${e.to})</span>
                         </div>
                     </div>
                 `).join('');
                 document.getElementById('viz-edges-output').classList.remove('hidden');
 
             } catch (err) {
-                msg.innerHTML = `<p class="text-red-500 text-lg">Failed to load network: ${err.message}</p>`;
+                msg.innerHTML = `<p class="text-warning text-lg">Failed: ${err.message}</p>`;
             }
         }
 
         function clearNetwork() {
-            if (network) {
-                network.destroy();
-                network = null;
-            }
+            if (network) { network.destroy(); network = null; }
             dataNodesCache = [];
             const container = document.getElementById('viz-container');
             container.innerHTML = `
-                <div id="viz-msg" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
-                    <i class="fas fa-network-wired text-4xl mb-3 opacity-50"></i>
-                    <p class="text-lg">Enter a node and click <b>Load Network</b> to see visible connections</p>
+                <div id="viz-msg" class="absolute inset-0 flex flex-col items-center justify-center text-muted">
+                    <i class="fas fa-network-wired text-3xl mb-2 opacity-30"></i>
+                    <p class="text-sm">Enter a node and click <b>Load Network</b> to see visible connections</p>
                 </div>
             `;
-            document.getElementById('viz-info').classList.add('hidden');
-            document.getElementById('viz-nodes-output').classList.add('hidden');
-            document.getElementById('viz-edges-output').classList.add('hidden');
+            document.getElementById('viz-info')?.classList.add('hidden');
+            document.getElementById('viz-nodes-output')?.classList.add('hidden');
+            document.getElementById('viz-edges-output')?.classList.add('hidden');
         }
     </script>
 </body>

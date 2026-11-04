@@ -1,0 +1,26 @@
+{
+  // Load persistent project guidelines and skill definitions
+  "instructions": [
+    "AGENTS.md",
+    ".opencode/skill/*/SKILL.md"
+  ],
+  "default_agent": "plan",
+  "agents": {
+    "plan": {
+      "description": "Read-only visualization and frontend architecture planner",
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": "ask"
+      }
+    },
+    "build": {
+      "description": "Full-access implementation agent enforcing file size limits",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true
+      }
+    }
+  }
+}
